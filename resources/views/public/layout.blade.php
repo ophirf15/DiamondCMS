@@ -8,6 +8,7 @@
     <link rel="canonical" href="{{ url()->current() }}">
     <meta property="og:title" content="{{ $title ?? config('app.name', 'DiamondCMS') }}">
     @isset($description)<meta property="og:description" content="{{ $description }}">@endisset
+    @include('partials.brand-head')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Sora:wght@400;550;650&display=swap" rel="stylesheet">
@@ -20,7 +21,10 @@
 <body class="dc-site">
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="dc-header">
-        <a class="dc-logo" href="{{ route('home') }}">{{ config('app.name', 'DiamondCMS') }}</a>
+        <a class="dc-logo inline-flex items-center gap-2" href="{{ route('home') }}">
+            <x-brand-logo variant="currentColor" class="h-7 w-7" />
+            <span>{{ config('app.name', 'DiamondCMS') }}</span>
+        </a>
         <nav aria-label="Primary">
             <a href="{{ route('projects.index') }}">Projects</a>
             <a href="{{ route('login') }}">Admin</a>

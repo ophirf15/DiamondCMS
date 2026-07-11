@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import type { SeparatorProps } from "reka-ui"
 import type { HTMLAttributes } from "vue"
 import { reactiveOmit } from "@vueuse/core"
 import { Separator } from "reka-ui"
 import { cn } from "@/lib/utils"
 
-const props = withDefaults(defineProps<
-  SeparatorProps & { class?: HTMLAttributes["class"] }
->(), {
+const props = withDefaults(defineProps<{
+  class?: HTMLAttributes["class"]
+  orientation?: "horizontal" | "vertical"
+  decorative?: boolean
+}>(), {
   orientation: "horizontal",
   decorative: true,
 })

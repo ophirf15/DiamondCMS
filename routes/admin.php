@@ -549,10 +549,36 @@ if (! function_exists('seed_starter_templates')) {
         ];
 
         foreach ($names as $name) {
+            $doc = BuilderDocument::empty($name);
+            $doc['blocks'] = [
+                [
+                    'id' => (string) Str::uuid(),
+                    'type' => 'section',
+                    'props' => ['padding' => '5rem 1.25rem'],
+                    'children' => [
+                        [
+                            'id' => (string) Str::uuid(),
+                            'type' => 'heading',
+                            'props' => ['level' => 1, 'text' => $name],
+                        ],
+                        [
+                            'id' => (string) Str::uuid(),
+                            'type' => 'text',
+                            'props' => ['text' => 'This starter layout is fully editable. Replace this copy, add sections, and publish when you are ready.'],
+                        ],
+                        [
+                            'id' => (string) Str::uuid(),
+                            'type' => 'button',
+                            'props' => ['text' => 'Contact me', 'url' => '/contact'],
+                        ],
+                    ],
+                ],
+            ];
+
             DB::table('builder_templates')->updateOrInsert(['slug' => Str::slug($name)], [
                 'name' => $name,
                 'category' => str_contains(Str::lower($name), 'resume') ? 'resume' : 'page',
-                'builder_json' => json_encode(BuilderDocument::empty($name), JSON_THROW_ON_ERROR),
+                'builder_json' => json_encode($doc, JSON_THROW_ON_ERROR),
                 'is_system' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

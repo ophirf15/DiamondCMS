@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { ScrollAreaRootProps } from "reka-ui"
 import type { HTMLAttributes } from "vue"
 import { reactiveOmit } from "@vueuse/core"
 import {
@@ -10,7 +9,12 @@ import {
 import { cn } from "@/lib/utils"
 import ScrollBar from "./ScrollBar.vue"
 
-const props = defineProps<ScrollAreaRootProps & { class?: HTMLAttributes["class"] }>()
+const props = defineProps<{
+  class?: HTMLAttributes["class"]
+  type?: "auto" | "always" | "scroll" | "hover"
+  dir?: "ltr" | "rtl"
+  scrollHideDelay?: number
+}>()
 
 const delegatedProps = reactiveOmit(props, "class")
 </script>
