@@ -2333,11 +2333,23 @@ html[data-dc-surface="soft"] .dc-project-cta.dc-button {
     }
 }
 
+[data-sonner-toaster][data-y-position='top'] {
+    top: 1.25rem !important;
+    right: 1.25rem !important;
+    left: auto !important;
+    bottom: auto !important;
+}
+
 [data-sonner-toaster][data-y-position='bottom'] {
     bottom: 1.25rem !important;
     right: 1.25rem !important;
     left: auto !important;
     top: auto !important;
+}
+
+.dc-admin-toaster [data-sonner-toast] {
+    max-width: min(24rem, calc(100vw - 2rem));
+    word-break: break-word;
 }
 
 .dc-live-edit-fab {

@@ -5,6 +5,15 @@ All notable changes to DiamondCMS are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-07-12
+
+### Fixed
+- GitHub update check uses `ophirf15/DiamondCMS`, returns a clear message when no Release exists, and supports private-repo asset downloads.
+- Admin API toasts show a short error message instead of Laravel debug exception dumps.
+
+### Changed
+- Tag-triggered GitHub Actions workflow publishes production ZIP releases.
+
 ## [0.1.0] - 2026-07-11
 
 ### Added
@@ -30,4 +39,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Explicitly ignored `storage/app/installed.lock` so installer state is never committed.
 
+[0.1.1]: https://github.com/ophirf15/DiamondCMS/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ophirf15/DiamondCMS/releases/tag/v0.1.0

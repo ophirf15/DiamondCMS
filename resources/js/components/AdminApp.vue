@@ -611,7 +611,7 @@ onMounted(load)
 <template>
     <div class="bg-background text-foreground flex min-h-screen">
         <Teleport to="body">
-            <Toaster rich-colors position="bottom-right" close-button class="dc-admin-toaster" />
+            <Toaster rich-colors position="top-right" close-button class="dc-admin-toaster" :visible-toasts="3" />
         </Teleport>
         <ActionToastHost />
 
