@@ -190,6 +190,17 @@ a:hover {
     gap: 1rem;
 }
 
+.dc-header-actions {
+    align-items: center;
+    display: flex;
+    gap: 0.65rem;
+    margin-left: auto;
+}
+
+.dc-nav-toggle {
+    display: none;
+}
+
 .dc-header-nav {
     align-items: center;
     display: flex;
@@ -206,6 +217,7 @@ a:hover {
     border: 1px solid var(--dc-line);
     border-radius: 999px;
     gap: 0.35rem;
+    margin-left: 0;
     padding: 0.35rem 0.55rem;
 }
 
@@ -236,6 +248,17 @@ a:hover {
     position: relative;
 }
 
+.dc-header--centered .dc-header-actions {
+    margin-left: 0;
+    position: absolute;
+    right: var(--dc-header-pad-x, 1.5rem);
+    top: var(--dc-header-pad-y, 1.35rem);
+}
+
+.dc-header--centered .dc-header-nav {
+    margin-left: 0;
+}
+
 .dc-logo--center {
     align-items: center;
     display: inline-flex;
@@ -250,10 +273,16 @@ a:hover {
     gap: 1rem;
 }
 
-.dc-header-actions {
-    align-items: center;
-    display: flex;
-    gap: 0.65rem;
+.dc-header--split .dc-header-nav {
+    margin-left: 0;
+}
+
+.dc-header--split .dc-logo {
+    margin-inline: auto;
+}
+
+.dc-header--split .dc-header-actions {
+    margin-left: 0;
 }
 
 .dc-theme-toggle {
@@ -1176,7 +1205,8 @@ html[data-dc-motion="off"] [data-dc-animate] {
     border-radius: calc(var(--dc-radius) + 0.5rem);
     color: #f4faf7;
     min-width: 0;
-    overflow: hidden;
+    /* visible so download menu isn't clipped (was overflow: hidden) */
+    overflow: visible;
     padding: 2rem;
 }
 
@@ -1321,6 +1351,7 @@ html[data-dc-motion="off"] [data-dc-animate] {
 .dc-resume-download {
     margin-top: 1.15rem;
     position: relative;
+    z-index: 5;
 }
 
 .dc-resume-download-trigger {
@@ -1358,7 +1389,7 @@ html[data-dc-motion="off"] [data-dc-animate] {
     transform: translateY(-0.35rem) scale(0.98);
     transform-origin: top left;
     transition: opacity 0.18s ease, transform 0.18s ease;
-    z-index: 20;
+    z-index: 40;
 }
 
 .dc-resume-download-menu:not([hidden]) {
@@ -1390,6 +1421,30 @@ html[data-dc-motion="off"] [data-dc-animate] {
 .dc-resume-aside .dc-resume-download-menu {
     background: #f4faf7;
     color: #141816;
+}
+
+/* Stack download options in-flow on small screens so nothing clips off-screen */
+@media (max-width: 800px) {
+    .dc-resume-download {
+        z-index: 1;
+    }
+
+    .dc-resume-download-trigger {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .dc-resume-download-menu {
+        left: auto;
+        min-width: 0;
+        position: static;
+        transform: none;
+        width: 100%;
+    }
+
+    .dc-resume-download-menu:not([hidden]) {
+        transform: none;
+    }
 }
 
 
@@ -2604,6 +2659,17 @@ html[data-dc-surface="soft"] .dc-project-cta.dc-button {
         grid-template-columns: 1fr;
     }
 
+    /* Portrait / media column above copy when the second cell holds an image */
+    .dc-columns:not([data-dc-mobile-stack]):has(> :nth-child(2) .dc-image):not(:has(> :nth-child(3))) > :nth-child(2),
+    .dc-columns[data-dc-mobile-stack='auto']:has(> :nth-child(2) .dc-image):not(:has(> :nth-child(3))) > :nth-child(2),
+    .dc-columns[data-dc-mobile-stack='image-first'] > :last-child {
+        order: -1;
+    }
+
+    .dc-columns[data-dc-mobile-stack='reverse'] > :first-child {
+        order: 1;
+    }
+
     .dc-shell-sidebar-dark .dc-sidebar-rail {
         height: auto;
         position: static;
@@ -2615,6 +2681,155 @@ html[data-dc-surface="soft"] .dc-project-cta.dc-button {
 
     .dc-grid {
         grid-template-columns: 1fr;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        background: color-mix(in srgb, var(--dc-surface) 88%, transparent);
+        border: 1px solid var(--dc-line);
+        border-radius: calc(var(--dc-radius) + 0.1rem);
+        color: var(--dc-fg);
+        cursor: pointer;
+        flex-shrink: 0;
+        gap: 0.45rem;
+        justify-content: center;
+        min-height: 2.35rem;
+        min-width: 2.35rem;
+        padding: 0.4rem 0.65rem;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header {
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        row-gap: 0.85rem;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header-nav {
+        border: 1px solid var(--dc-line);
+        border-radius: calc(var(--dc-radius) + 0.25rem);
+        display: none;
+        flex: 1 1 100%;
+        flex-direction: column;
+        gap: 0.15rem;
+        margin-left: 0;
+        order: 5;
+        padding: 0.45rem;
+        width: 100%;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header-nav--pill {
+        border-radius: calc(var(--dc-radius) + 0.35rem);
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header.is-nav-open .dc-header-nav {
+        display: flex;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header-nav a {
+        border-radius: calc(var(--dc-radius) - 0.05rem);
+        display: block;
+        padding: 0.7rem 0.85rem;
+        width: 100%;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header-nav a:hover {
+        background: color-mix(in srgb, var(--dc-primary) 12%, transparent);
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header--centered {
+        align-items: stretch;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header--centered .dc-logo--center {
+        margin-inline: auto;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header--split .dc-header-cta {
+        display: none;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-header--split .dc-logo {
+        margin-inline: 0;
+    }
+
+    .dc-nav-toggle-icon {
+        display: block;
+        height: 0.9rem;
+        position: relative;
+        width: 1.15rem;
+    }
+
+    .dc-nav-toggle-icon span {
+        background: currentColor;
+        border-radius: 999px;
+        display: block;
+        height: 2px;
+        left: 0;
+        position: absolute;
+        right: 0;
+        transition: transform 0.2s ease, opacity 0.2s ease, top 0.2s ease;
+    }
+
+    .dc-nav-toggle-icon span:nth-child(1) { top: 0; }
+    .dc-nav-toggle-icon span:nth-child(2) { top: calc(50% - 1px); }
+    .dc-nav-toggle-icon span:nth-child(3) { bottom: 0; top: auto; }
+
+    .is-nav-open .dc-nav-toggle-icon span:nth-child(1) {
+        top: calc(50% - 1px);
+        transform: rotate(45deg);
+    }
+
+    .is-nav-open .dc-nav-toggle-icon span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .is-nav-open .dc-nav-toggle-icon span:nth-child(3) {
+        bottom: auto;
+        top: calc(50% - 1px);
+        transform: rotate(-45deg);
+    }
+
+    .dc-nav-toggle-label {
+        font-size: 0.72rem;
+        font-weight: 650;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-sidebar-rail {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: 1fr auto;
+        padding: 1rem 1.15rem;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-sidebar-brand {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-nav-toggle {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-sidebar-nav {
+        display: none;
+        flex-direction: column;
+        gap: 0.2rem;
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-sidebar-rail.is-nav-open .dc-sidebar-nav {
+        display: flex;
+    }
+
+    [data-dc-mobile-nav='hamburger'] .dc-shell-sidebar-dark .dc-theme-toggle {
+        grid-column: 1 / -1;
     }
 }
 

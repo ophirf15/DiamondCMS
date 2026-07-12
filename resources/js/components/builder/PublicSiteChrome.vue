@@ -8,6 +8,7 @@ export type SocialLinkItem = { label: string, url: string, icon?: string }
 
 export type ChromeConfig = {
     headerStyle: string
+    mobileNav?: string
     footerStyle: string
     buttonStyle: string
     footerShowLogo: boolean
@@ -50,6 +51,7 @@ const footerSocialStyle = computed(() => props.chrome.footerSocialStyle || 'icon
             `dc-btn-${chrome.buttonStyle}`,
         ]"
         :data-dc-button="chrome.buttonStyle"
+        :data-dc-mobile-nav="chrome.mobileNav || 'hamburger'"
     >
         <template v-if="shell === 'sidebar-dark'">
             <div class="dc-sidebar-shell">
@@ -129,30 +131,13 @@ const footerSocialStyle = computed(() => props.chrome.footerSocialStyle || 'icon
         </template>
 
         <template v-else>
-            <header class="dc-header" :class="`dc-header--${chrome.headerStyle}`">
+            <header
+                class="dc-header"
+                :class="`dc-header--${chrome.headerStyle}`"
+                data-dc-nav-root
+            >
                 <template v-if="chrome.headerStyle === 'centered'">
                     <a class="dc-logo dc-logo--center" :href="publicUrl">
-                        <img :src="logoUrl" alt="" class="h-7 w-auto">
-                        <span>{{ siteName }}</span>
-                    </a>
-                    <nav class="dc-header-nav dc-header-nav--center" aria-label="Primary">
-                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
-                    </nav>
-                </template>
-                <template v-else-if="chrome.headerStyle === 'pill'">
-                    <a class="dc-logo" :href="publicUrl">
-                        <img :src="logoUrl" alt="" class="h-7 w-auto">
-                        <span>{{ siteName }}</span>
-                    </a>
-                    <nav class="dc-header-nav dc-header-nav--pill" aria-label="Primary">
-                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
-                    </nav>
-                </template>
-                <template v-else-if="chrome.headerStyle === 'split'">
-                    <nav class="dc-header-nav" aria-label="Primary">
-                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
-                    </nav>
-                    <a class="dc-logo" :href="publicUrl">
                         <img :src="logoUrl" alt="" class="h-7 w-auto">
                         <span>{{ siteName }}</span>
                     </a>
@@ -166,22 +151,24 @@ const footerSocialStyle = computed(() => props.chrome.footerSocialStyle || 'icon
                         >
                             Theme
                         </button>
-                        <a class="dc-button" href="/contact">Contact</a>
+                        <button type="button" class="dc-nav-toggle" data-dc-nav-toggle aria-expanded="false" aria-controls="dc-preview-nav" aria-label="Open menu">
+                            <span class="dc-nav-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
+                            <span class="dc-nav-toggle-label">Menu</span>
+                        </button>
                     </div>
+                    <nav id="dc-preview-nav" class="dc-header-nav dc-header-nav--center" aria-label="Primary" data-dc-primary-nav>
+                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
+                    </nav>
                 </template>
-                <template v-else>
+                <template v-else-if="chrome.headerStyle === 'pill'">
                     <a class="dc-logo inline-flex items-center gap-2" :href="publicUrl">
                         <img :src="logoUrl" alt="" class="h-7 w-auto">
                         <span>{{ siteName }}</span>
                     </a>
-                    <div class="dc-header-right">
-                        <nav
-                            class="dc-header-nav"
-                            :class="chrome.headerStyle === 'minimal' ? 'dc-header-nav--minimal' : ''"
-                            aria-label="Primary"
-                        >
-                            <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
-                        </nav>
+                    <nav id="dc-preview-nav" class="dc-header-nav dc-header-nav--pill" aria-label="Primary" data-dc-primary-nav>
+                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
+                    </nav>
+                    <div class="dc-header-actions">
                         <button
                             v-if="visitorToggle"
                             type="button"
@@ -191,17 +178,67 @@ const footerSocialStyle = computed(() => props.chrome.footerSocialStyle || 'icon
                         >
                             Theme
                         </button>
+                        <button type="button" class="dc-nav-toggle" data-dc-nav-toggle aria-expanded="false" aria-controls="dc-preview-nav" aria-label="Open menu">
+                            <span class="dc-nav-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
+                            <span class="dc-nav-toggle-label">Menu</span>
+                        </button>
                     </div>
                 </template>
-                <button
-                    v-if="visitorToggle && (chrome.headerStyle === 'centered' || chrome.headerStyle === 'pill')"
-                    type="button"
-                    class="dc-theme-toggle dc-theme-toggle--corner"
-                    data-dc-theme-toggle-btn
-                    aria-label="Toggle light and dark mode"
-                >
-                    Theme
-                </button>
+                <template v-else-if="chrome.headerStyle === 'split'">
+                    <nav id="dc-preview-nav" class="dc-header-nav" aria-label="Primary" data-dc-primary-nav>
+                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
+                    </nav>
+                    <a class="dc-logo inline-flex items-center gap-2" :href="publicUrl">
+                        <img :src="logoUrl" alt="" class="h-7 w-auto">
+                        <span>{{ siteName }}</span>
+                    </a>
+                    <div class="dc-header-actions">
+                        <button
+                            v-if="visitorToggle"
+                            type="button"
+                            class="dc-theme-toggle"
+                            data-dc-theme-toggle-btn
+                            aria-label="Toggle light and dark mode"
+                        >
+                            Theme
+                        </button>
+                        <a class="dc-button dc-header-cta" href="/contact">Contact</a>
+                        <button type="button" class="dc-nav-toggle" data-dc-nav-toggle aria-expanded="false" aria-controls="dc-preview-nav" aria-label="Open menu">
+                            <span class="dc-nav-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
+                            <span class="dc-nav-toggle-label">Menu</span>
+                        </button>
+                    </div>
+                </template>
+                <template v-else>
+                    <a class="dc-logo inline-flex items-center gap-2" :href="publicUrl">
+                        <img :src="logoUrl" alt="" class="h-7 w-auto">
+                        <span>{{ siteName }}</span>
+                    </a>
+                    <nav
+                        id="dc-preview-nav"
+                        class="dc-header-nav"
+                        :class="chrome.headerStyle === 'minimal' ? 'dc-header-nav--minimal' : ''"
+                        aria-label="Primary"
+                        data-dc-primary-nav
+                    >
+                        <a v-for="item in menuItems" :key="item.label + item.url" :href="item.url">{{ item.label }}</a>
+                    </nav>
+                    <div class="dc-header-actions">
+                        <button
+                            v-if="visitorToggle"
+                            type="button"
+                            class="dc-theme-toggle"
+                            data-dc-theme-toggle-btn
+                            aria-label="Toggle light and dark mode"
+                        >
+                            Theme
+                        </button>
+                        <button type="button" class="dc-nav-toggle" data-dc-nav-toggle aria-expanded="false" aria-controls="dc-preview-nav" aria-label="Open menu">
+                            <span class="dc-nav-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
+                            <span class="dc-nav-toggle-label">Menu</span>
+                        </button>
+                    </div>
+                </template>
             </header>
             <main class="dc-live-canvas">
                 <slot />

@@ -51,6 +51,7 @@ final class DesignManager
             ],
             'chrome' => [
                 'headerStyle' => 'classic',
+                'mobileNav' => 'hamburger',
                 'footerStyle' => 'branded',
                 'footerShowLogo' => true,
                 'footerShowSiteName' => true,
@@ -513,11 +514,27 @@ final class DesignManager
         return (bool) ((self::tokens()['themeControl'] ?? [])['lockMode'] ?? false);
     }
 
+    /** @return array<string, array{label: string, description: string}> */
+    public static function mobileNavModes(): array
+    {
+        return [
+            'hamburger' => ['label' => 'Hamburger', 'description' => 'Collapse links behind a menu button on small screens'],
+            'wrap' => ['label' => 'Wrap links', 'description' => 'Keep all links visible; they wrap under the logo'],
+        ];
+    }
+
     public static function headerStyle(): string
     {
         $style = (string) ((self::tokens()['chrome'] ?? [])['headerStyle'] ?? 'classic');
 
         return array_key_exists($style, self::headerStyles()) ? $style : 'classic';
+    }
+
+    public static function mobileNav(): string
+    {
+        $mode = (string) ((self::tokens()['chrome'] ?? [])['mobileNav'] ?? 'hamburger');
+
+        return array_key_exists($mode, self::mobileNavModes()) ? $mode : 'hamburger';
     }
 
     public static function footerStyle(): string

@@ -21,6 +21,7 @@ type DesignTokens = {
     atmosphere?: { preset: string, custom: string }
     chrome?: {
         headerStyle: string
+        mobileNav?: string
         footerStyle: string
         footerShowLogo: boolean
         footerShowSiteName: boolean
@@ -118,6 +119,11 @@ const headerStyles: StylePreset[] = [
     { key: 'minimal', label: 'Minimal', description: 'Thin bar, quiet links' },
     { key: 'centered', label: 'Centered brand', description: 'Logo above links' },
     { key: 'split', label: 'Split CTA', description: 'Links left, action right' },
+]
+
+const mobileNavModes: StylePreset[] = [
+    { key: 'hamburger', label: 'Hamburger', description: 'Menu button on phones; full links on desktop' },
+    { key: 'wrap', label: 'Wrap links', description: 'Keep every link visible; they wrap under the logo' },
 ]
 
 const footerStyles: StylePreset[] = [
@@ -298,6 +304,7 @@ function ensureChrome(tokensValue: DesignTokens): void {
     if (!tokensValue.chrome) {
         tokensValue.chrome = {
             headerStyle: 'classic',
+            mobileNav: 'hamburger',
             footerStyle: 'branded',
             footerShowLogo: true,
             footerShowSiteName: true,
@@ -309,6 +316,7 @@ function ensureChrome(tokensValue: DesignTokens): void {
             footerSocialStyle: 'icons',
         }
     } else {
+        tokensValue.chrome.mobileNav ??= 'hamburger'
         tokensValue.chrome.footerShowCredit ??= true
         tokensValue.chrome.footerCreditText ??= 'Powered by DiamondCMS'
         tokensValue.chrome.footerCreditUrl ??= ''
@@ -645,7 +653,7 @@ onMounted(load)
                                 <CardTitle>Header style</CardTitle>
                                 <CardDescription>Pick a top menu layout. Link labels are edited under Menus.</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent class="space-y-5">
                                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                     <button
                                         v-for="style in headerStyles"
@@ -682,6 +690,23 @@ onMounted(load)
                                             <div class="text-muted-foreground text-xs">{{ style.description }}</div>
                                         </div>
                                     </button>
+                                </div>
+                                <div class="space-y-2">
+                                    <Label>Mobile navigation</Label>
+                                    <p class="text-muted-foreground text-xs">How the header menu behaves below ~800px.</p>
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <button
+                                            v-for="mode in mobileNavModes"
+                                            :key="mode.key"
+                                            type="button"
+                                            class="hover:border-primary rounded-xl border px-3 py-2.5 text-left transition"
+                                            :class="(tokens.chrome?.mobileNav || 'hamburger') === mode.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                            @click="tokens.chrome && (tokens.chrome.mobileNav = mode.key)"
+                                        >
+                                            <div class="text-sm font-medium">{{ mode.label }}</div>
+                                            <div class="text-muted-foreground text-xs">{{ mode.description }}</div>
+                                        </button>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

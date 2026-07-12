@@ -90,6 +90,7 @@ final class AnalyticsAndChromeControlsTest extends TestCase
             'mode' => 'dark',
             'chrome' => [
                 'headerStyle' => 'pill',
+                'mobileNav' => 'hamburger',
                 'footerStyle' => 'split',
                 'footerShowLogo' => true,
                 'footerShowSiteName' => true,
@@ -127,6 +128,8 @@ final class AnalyticsAndChromeControlsTest extends TestCase
         $this->assertStringContainsString('dc-header--pill', $html);
         $this->assertStringContainsString('dc-footer--split', $html);
         $this->assertStringContainsString('dc-btn-outline', $html);
+        $this->assertStringContainsString('data-dc-mobile-nav="hamburger"', $html);
+        $this->assertStringContainsString('data-dc-nav-toggle', $html);
         $this->assertStringContainsString('data-dc-theme-lock="1"', $html);
         $this->assertStringContainsString('data-dc-theme-toggle="0"', $html);
         $this->assertStringContainsString('Built with care', $html);

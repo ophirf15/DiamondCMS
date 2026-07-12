@@ -252,6 +252,54 @@ export function initResumeDownloads(): void {
     })
 }
 
+export function initMobileNav(): void {
+    const mode = document.body.dataset.dcMobileNav || 'hamburger'
+    if (mode !== 'hamburger') return
+
+    document.querySelectorAll<HTMLElement>('[data-dc-nav-root]').forEach((root) => {
+        const toggle = root.querySelector<HTMLButtonElement>('[data-dc-nav-toggle]')
+        const nav = root.querySelector<HTMLElement>('[data-dc-primary-nav]')
+        if (!toggle || !nav) return
+
+        const setOpen = (open: boolean): void => {
+            root.classList.toggle('is-nav-open', open)
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+            toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+        }
+
+        toggle.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setOpen(!root.classList.contains('is-nav-open'))
+        })
+
+        nav.querySelectorAll('a').forEach((link) => {
+            link.addEventListener('click', () => setOpen(false))
+        })
+    })
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return
+        document.querySelectorAll<HTMLElement>('[data-dc-nav-root].is-nav-open').forEach((root) => {
+            const toggle = root.querySelector<HTMLButtonElement>('[data-dc-nav-toggle]')
+            root.classList.remove('is-nav-open')
+            toggle?.setAttribute('aria-expanded', 'false')
+            toggle?.setAttribute('aria-label', 'Open menu')
+        })
+    })
+
+    window.addEventListener('resize', () => {
+        if (window.matchMedia('(min-width: 801px)').matches) {
+            document.querySelectorAll<HTMLElement>('[data-dc-nav-root].is-nav-open').forEach((root) => {
+                const toggle = root.querySelector<HTMLButtonElement>('[data-dc-nav-toggle]')
+                root.classList.remove('is-nav-open')
+                toggle?.setAttribute('aria-expanded', 'false')
+                toggle?.setAttribute('aria-label', 'Open menu')
+            })
+        }
+    })
+}
+
 export function initPublicSite(): void {
     initThemeToggle()
     observeReveals()
@@ -259,6 +307,7 @@ export function initPublicSite(): void {
     initLightbox()
     initGalleryCarousels()
     initResumeDownloads()
+    initMobileNav()
 }
 
 function boot(): void {

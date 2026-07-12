@@ -290,6 +290,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'shell' => $document['meta']['shell'] ?? 'default',
                 'chrome' => [
                     'headerStyle' => DesignManager::headerStyle(),
+                    'mobileNav' => DesignManager::mobileNav(),
                     'footerStyle' => DesignManager::footerStyle(),
                     'buttonStyle' => DesignManager::buttonStyle(),
                     'footerShowLogo' => (bool) ($chrome['footerShowLogo'] ?? true),

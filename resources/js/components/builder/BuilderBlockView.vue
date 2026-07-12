@@ -331,6 +331,7 @@ const galleryImages = computed(() => {
             :style="live
                 ? { '--dc-columns': Math.max(1, Number(block.props.columns || 2)) }
                 : { gridTemplateColumns: `repeat(${Math.max(1, Number(block.props.columns || 2))}, minmax(0, 1fr))` }"
+            :data-dc-mobile-stack="live ? String(block.props.mobileStack || 'auto') : undefined"
             group="builder-blocks"
             :animation="180"
             @end="emit('update')"
@@ -359,6 +360,7 @@ const galleryImages = computed(() => {
             :style="live
                 ? { '--dc-columns': Math.max(1, Number(block.props.columns || 2)) }
                 : { gridTemplateColumns: `repeat(${Math.max(1, Number(block.props.columns || 2))}, minmax(0, 1fr))` }"
+            :data-dc-mobile-stack="live ? String(block.props.mobileStack || 'auto') : undefined"
             >
             <BuilderBlockView
                 v-for="child in block.children"

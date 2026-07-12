@@ -29,6 +29,7 @@
     $footerStyle = \App\Domains\Design\Support\DesignManager::footerStyle();
     $buttonStyle = \App\Domains\Design\Support\DesignManager::buttonStyle();
     $chrome = \App\Domains\Design\Support\DesignManager::chrome();
+    $mobileNav = \App\Domains\Design\Support\DesignManager::mobileNav();
     $visitorToggle = \App\Domains\Design\Support\DesignManager::visitorToggleEnabled();
     $themeLocked = \App\Domains\Design\Support\DesignManager::themeLocked();
     $defaultTheme = \App\Domains\Design\Support\DesignManager::resolvedDefaultTheme();
@@ -45,6 +46,7 @@
     data-dc-surface="{{ $surface }}"
     data-dc-density="{{ $uiKit['density'] ?? 'comfortable' }}"
     data-dc-control="{{ $uiKit['controlStyle'] ?? 'soft' }}"
+    data-dc-mobile-nav="{{ $mobileNav }}"
     data-dc-resume-density="{{ $resumeDensity }}"
     data-dc-resume-rhythm="{{ $resumeRhythm }}"
     data-dc-resume-experience="{{ $resumeExperience }}"
@@ -56,12 +58,13 @@
 
     @if ($shell === 'sidebar-dark')
         <div class="dc-sidebar-shell">
-            <aside class="dc-sidebar-rail" data-dc-animate="rise">
+            <aside class="dc-sidebar-rail" data-dc-animate="rise" data-dc-nav-root>
                 <a class="dc-sidebar-brand" href="{{ route('home') }}">
                     <img src="{{ diamondcms_logo_url() }}" alt="" class="dc-sidebar-photo">
                     <strong>{{ diamondcms_site_name() }}</strong>
                 </a>
-                <nav class="dc-sidebar-nav" aria-label="Primary">
+                @include('public.partials.nav-toggle', ['navId' => 'dc-sidebar-nav'])
+                <nav id="dc-sidebar-nav" class="dc-sidebar-nav" aria-label="Primary" data-dc-primary-nav>
                     @php($headerItems = diamondcms_menu('header'))
                     @forelse ($headerItems as $item)
                         <a href="{{ $item['url'] }}">{{ $item['label'] }}</a>
@@ -88,28 +91,9 @@
             </div>
         </div>
     @else
-        <header class="dc-header dc-header--{{ $headerStyle }}">
+        <header class="dc-header dc-header--{{ $headerStyle }}" data-dc-nav-root>
             @if ($headerStyle === 'centered')
                 <a class="dc-logo dc-logo--center" href="{{ route('home') }}">
-                    <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
-                    <span>{{ diamondcms_site_name() }}</span>
-                </a>
-                <nav class="dc-header-nav dc-header-nav--center" aria-label="Primary">
-                    @include('public.partials.nav-links')
-                </nav>
-            @elseif ($headerStyle === 'pill')
-                <a class="dc-logo" href="{{ route('home') }}">
-                    <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
-                    <span>{{ diamondcms_site_name() }}</span>
-                </a>
-                <nav class="dc-header-nav dc-header-nav--pill" aria-label="Primary">
-                    @include('public.partials.nav-links')
-                </nav>
-            @elseif ($headerStyle === 'split')
-                <nav class="dc-header-nav" aria-label="Primary">
-                    @include('public.partials.nav-links')
-                </nav>
-                <a class="dc-logo" href="{{ route('home') }}">
                     <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
                     <span>{{ diamondcms_site_name() }}</span>
                 </a>
@@ -117,24 +101,54 @@
                     @if ($visitorToggle)
                         <button type="button" class="dc-theme-toggle" data-dc-theme-toggle-btn aria-label="Toggle light and dark mode">Theme</button>
                     @endif
-                    <a class="dc-button" href="{{ url('/contact') }}">Contact</a>
+                    @include('public.partials.nav-toggle')
+                </div>
+                <nav id="dc-primary-nav" class="dc-header-nav dc-header-nav--center" aria-label="Primary" data-dc-primary-nav>
+                    @include('public.partials.nav-links')
+                </nav>
+            @elseif ($headerStyle === 'pill')
+                <a class="dc-logo inline-flex items-center gap-2" href="{{ route('home') }}">
+                    <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
+                    <span>{{ diamondcms_site_name() }}</span>
+                </a>
+                <nav id="dc-primary-nav" class="dc-header-nav dc-header-nav--pill" aria-label="Primary" data-dc-primary-nav>
+                    @include('public.partials.nav-links')
+                </nav>
+                <div class="dc-header-actions">
+                    @if ($visitorToggle)
+                        <button type="button" class="dc-theme-toggle" data-dc-theme-toggle-btn aria-label="Toggle light and dark mode">Theme</button>
+                    @endif
+                    @include('public.partials.nav-toggle')
+                </div>
+            @elseif ($headerStyle === 'split')
+                <nav id="dc-primary-nav" class="dc-header-nav" aria-label="Primary" data-dc-primary-nav>
+                    @include('public.partials.nav-links')
+                </nav>
+                <a class="dc-logo inline-flex items-center gap-2" href="{{ route('home') }}">
+                    <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
+                    <span>{{ diamondcms_site_name() }}</span>
+                </a>
+                <div class="dc-header-actions">
+                    @if ($visitorToggle)
+                        <button type="button" class="dc-theme-toggle" data-dc-theme-toggle-btn aria-label="Toggle light and dark mode">Theme</button>
+                    @endif
+                    <a class="dc-button dc-header-cta" href="{{ url('/contact') }}">Contact</a>
+                    @include('public.partials.nav-toggle')
                 </div>
             @else
                 <a class="dc-logo inline-flex items-center gap-2" href="{{ route('home') }}">
                     <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto">
                     <span>{{ diamondcms_site_name() }}</span>
                 </a>
-                <div class="dc-header-right">
-                    <nav class="dc-header-nav {{ $headerStyle === 'minimal' ? 'dc-header-nav--minimal' : '' }}" aria-label="Primary">
-                        @include('public.partials.nav-links')
-                    </nav>
+                <nav id="dc-primary-nav" class="dc-header-nav {{ $headerStyle === 'minimal' ? 'dc-header-nav--minimal' : '' }}" aria-label="Primary" data-dc-primary-nav>
+                    @include('public.partials.nav-links')
+                </nav>
+                <div class="dc-header-actions">
                     @if ($visitorToggle)
                         <button type="button" class="dc-theme-toggle" data-dc-theme-toggle-btn aria-label="Toggle light and dark mode">Theme</button>
                     @endif
+                    @include('public.partials.nav-toggle')
                 </div>
-            @endif
-            @if ($visitorToggle && in_array($headerStyle, ['centered', 'pill'], true))
-                <button type="button" class="dc-theme-toggle dc-theme-toggle--corner" data-dc-theme-toggle-btn aria-label="Toggle light and dark mode">Theme</button>
             @endif
         </header>
         <main id="content">

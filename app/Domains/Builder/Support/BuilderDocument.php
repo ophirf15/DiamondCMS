@@ -91,7 +91,7 @@ final class BuilderDocument
     {
         return [
             ['type' => 'section', 'label' => 'Section', 'defaults' => ['padding' => '4rem 1rem']],
-            ['type' => 'columns', 'label' => 'Columns', 'defaults' => ['columns' => 2]],
+            ['type' => 'columns', 'label' => 'Columns', 'defaults' => ['columns' => 2, 'mobileStack' => 'auto']],
             ['type' => 'heading', 'label' => 'Heading', 'defaults' => ['level' => 2, 'text' => 'Heading']],
             ['type' => 'text', 'label' => 'Text', 'defaults' => ['text' => 'Write your copy here.']],
             ['type' => 'image', 'label' => 'Image', 'defaults' => ['src' => '', 'alt' => '']],
@@ -161,7 +161,14 @@ final class BuilderDocument
 
         return match ($block['type']) {
             'section' => '<section class="dc-section'.($depth > 0 ? ' dc-section--nested' : '').'" data-dc-animate="rise" style="'.e(self::style(['padding' => Arr::get($props, 'padding', $depth > 0 ? '0.5rem' : '4rem 1rem')])).'">'.$children.'</section>',
-            'columns' => '<div class="dc-columns" data-dc-animate="stagger" style="'.e('--dc-columns: '.max(1, (int) Arr::get($props, 'columns', 2))).'">'.$children.'</div>',
+            'columns' => (static function () use ($props, $children): string {
+                $stack = (string) Arr::get($props, 'mobileStack', 'auto');
+                if (! in_array($stack, ['auto', 'image-first', 'as-is', 'reverse'], true)) {
+                    $stack = 'auto';
+                }
+
+                return '<div class="dc-columns" data-dc-animate="stagger" data-dc-mobile-stack="'.e($stack).'" style="'.e('--dc-columns: '.max(1, (int) Arr::get($props, 'columns', 2))).'">'.$children.'</div>';
+            })(),
             'heading' => self::heading($props),
             'text' => '<div class="dc-text" data-dc-animate="fade">'.self::formatText((string) Arr::get($props, 'text', '')).'</div>',
             'image' => '<img class="dc-image" data-dc-animate="parallax" src="'.e((string) Arr::get($props, 'src', '')).'" alt="'.e((string) Arr::get($props, 'alt', '')).'" loading="lazy">',

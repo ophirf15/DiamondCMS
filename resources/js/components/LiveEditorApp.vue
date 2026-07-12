@@ -82,6 +82,7 @@ const menuItems = boot.menuItems?.length
 const footerItems = boot.footerItems || []
 const chrome = computed<ChromeConfig>(() => boot.chrome || {
     headerStyle: 'classic',
+    mobileNav: 'hamburger',
     footerStyle: 'branded',
     buttonStyle: 'solid',
     footerShowLogo: true,

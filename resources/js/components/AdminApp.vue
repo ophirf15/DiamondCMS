@@ -151,6 +151,7 @@ const mediaPickerTarget = ref<{ field: 'src' } | { field: 'images', index: numbe
 const uploadingImage = ref(false)
 const siteChrome = ref<ChromeConfig>({
     headerStyle: 'classic',
+    mobileNav: 'hamburger',
     footerStyle: 'branded',
     buttonStyle: 'solid',
     footerShowLogo: true,
@@ -358,6 +359,7 @@ async function load(): Promise<void> {
         }>('/design')
         siteChrome.value = {
             headerStyle: design.chrome?.headerStyle || 'classic',
+            mobileNav: design.chrome?.mobileNav || 'hamburger',
             footerStyle: design.chrome?.footerStyle || 'branded',
             buttonStyle: design.buttons?.style || design.chrome?.buttonStyle || 'solid',
             footerShowLogo: design.chrome?.footerShowLogo ?? true,

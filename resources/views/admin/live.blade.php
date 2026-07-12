@@ -23,6 +23,7 @@
     class="dc-site dc-live-editing min-h-screen antialiased dc-header-{{ \App\Domains\Design\Support\DesignManager::headerStyle() }} dc-footer-{{ \App\Domains\Design\Support\DesignManager::footerStyle() }} dc-btn-{{ \App\Domains\Design\Support\DesignManager::buttonStyle() }}"
     data-dc-motion="off"
     data-dc-button="{{ \App\Domains\Design\Support\DesignManager::buttonStyle() }}"
+    data-dc-mobile-nav="{{ \App\Domains\Design\Support\DesignManager::mobileNav() }}"
     data-dc-theme-default="{{ \App\Domains\Design\Support\DesignManager::resolvedDefaultTheme() }}"
     data-dc-theme-lock="{{ \App\Domains\Design\Support\DesignManager::themeLocked() ? '1' : '0' }}"
     data-dc-theme-toggle="{{ \App\Domains\Design\Support\DesignManager::visitorToggleEnabled() ? '1' : '0' }}"

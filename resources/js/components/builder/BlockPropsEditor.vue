@@ -43,8 +43,8 @@ function isPlain(value: unknown): boolean {
 const scalarKeys = computed(() =>
     Object.keys(props.block.props).filter((key) => {
         if (key === 'items' || key === 'images' || key === 'bullets' || key === 'variant') return false
-        // Image src is handled with media picker UI below.
         if (props.block.type === 'image' && key === 'src') return false
+        if (props.block.type === 'columns' && key === 'mobileStack') return false
         return isPlain(props.block.props[key])
     }),
 )
@@ -236,6 +236,22 @@ function removeGallery(index: number): void {
                 </div>
                 <p class="text-muted-foreground text-xs">Or drag a photo from your computer onto the image block on the canvas.</p>
             </div>
+        </div>
+
+        <div v-if="block.type === 'columns'" class="space-y-2">
+            <Label for="columns-mobile-stack">Mobile stack order</Label>
+            <select
+                id="columns-mobile-stack"
+                class="border-input bg-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-2"
+                :value="String(block.props.mobileStack || 'auto')"
+                @change="setScalar('mobileStack', ($event.target as HTMLSelectElement).value)"
+            >
+                <option value="auto">Auto (image above text when present)</option>
+                <option value="image-first">Image / last column first</option>
+                <option value="as-is">Keep desktop order</option>
+                <option value="reverse">Reverse columns</option>
+            </select>
+            <p class="text-muted-foreground text-xs">Desktop layout stays the same. This only changes the stack order on phones.</p>
         </div>
 
         <div v-for="key in scalarKeys" :key="key" class="space-y-2">
