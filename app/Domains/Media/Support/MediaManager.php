@@ -42,7 +42,14 @@ final class MediaManager
         $path = 'media/'.date('Y/m').'/'.Str::uuid().'.'.$extension;
         Storage::disk('public')->put($path, $contents);
 
-        $variants = str_starts_with($mime, 'image/') ? $this->createImageVariants($path) : [];
+        $variants = [];
+        if (str_starts_with($mime, 'image/')) {
+            try {
+                $variants = $this->createImageVariants($path);
+            } catch (\Throwable) {
+                $variants = [];
+            }
+        }
 
         return (int) DB::table('media_items')->insertGetId([
             'folder_id' => $attributes['folder_id'] ?? null,
@@ -95,6 +102,52 @@ final class MediaManager
         if ($usageCount > 0 && ! $force) {
             throw new RuntimeException('Media item is in use and requires explicit force deletion.');
         }
+    }
+
+    public function restore(int $mediaId): void
+    {
+        DB::table('media_items')->where('id', $mediaId)->whereNotNull('deleted_at')->update([
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function forceDelete(int $mediaId): void
+    {
+        $item = DB::table('media_items')->where('id', $mediaId)->first();
+        if (! $item) {
+            return;
+        }
+
+        $disk = Storage::disk($item->disk ?: 'public');
+        $paths = [$item->path];
+        $variants = is_string($item->variants) ? json_decode($item->variants, true) : ($item->variants ?? []);
+        if (is_array($variants)) {
+            foreach ($variants as $variantPath) {
+                if (is_string($variantPath) && $variantPath !== '') {
+                    $paths[] = $variantPath;
+                }
+            }
+        }
+
+        foreach (array_unique($paths) as $path) {
+            if ($disk->exists($path)) {
+                $disk->delete($path);
+            }
+        }
+
+        DB::table('media_usages')->where('media_item_id', $mediaId)->delete();
+        DB::table('media_items')->where('id', $mediaId)->delete();
+    }
+
+    /** @return array<string, mixed> */
+    public function payload(int $mediaId): array
+    {
+        $item = DB::table('media_items')->where('id', $mediaId)->firstOrFail();
+        $row = (array) $item;
+        $row['url'] = '/storage/'.ltrim((string) $item->path, '/');
+
+        return $row;
     }
 
     /** @return array<string, string> */

@@ -78,7 +78,7 @@ final class MailSettingsManager
         ]);
     }
 
-    private function applyActiveSettings(): void
+    public function applyActiveSettings(): void
     {
         $settings = DB::table('mail_settings')->where('is_active', true)->first();
         if (! $settings) {

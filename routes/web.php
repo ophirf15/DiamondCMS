@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Activity\Support\ActivityLogger;
+use App\Domains\Analytics\Support\AnalyticsManager;
 use App\Domains\Builder\Support\BuilderDocument;
 use App\Domains\Forms\Support\FormManager;
 use App\Domains\Health\Http\Controllers\HealthController;
@@ -26,9 +27,24 @@ Route::get('/', function () {
         return view('public.landing');
     }
 
-    $home = DB::table('pages')->where('slug', 'home')->where('status', 'published')->first();
+    $homepageSlug = diamondcms_setting('homepage_slug', 'home');
+    if (! is_string($homepageSlug) || $homepageSlug === '') {
+        $homepageSlug = 'home';
+    }
 
-    return $home ? view('public.page', ['page' => $home, 'content' => BuilderDocument::render(json_decode($home->builder_json, true) ?: BuilderDocument::empty($home->title))]) : view('public.landing');
+    $home = DB::table('pages')->where('slug', $homepageSlug)->where('status', 'published')->first();
+
+    if ($home) {
+        try {
+            app(AnalyticsManager::class)->trackPageView($home);
+        } catch (\Throwable) {
+            // Analytics table may not exist yet during upgrades.
+        }
+
+        return view('public.page', ['page' => $home, 'content' => BuilderDocument::render(json_decode($home->builder_json, true) ?: BuilderDocument::empty($home->title))]);
+    }
+
+    return view('public.landing');
 })->name('home');
 
 Route::get('/health', [HealthController::class, 'public'])->name('health.public');
@@ -79,9 +95,19 @@ Route::middleware('guest')->group(function (): void {
         $request->validate(['code' => ['required', 'string']]);
         $user = User::findOrFail($request->session()->get('2fa:user:id'));
         $google2fa = app('pragmarx.google2fa');
+        $code = trim($request->string('code')->toString());
+        $validTotp = $google2fa->verifyKey(decrypt($user->two_factor_secret), $code);
 
-        if (! $google2fa->verifyKey(decrypt($user->two_factor_secret), $request->string('code')->toString())) {
-            return back()->withErrors(['code' => 'The two-factor code is invalid.']);
+        if (! $validTotp) {
+            $codes = $user->two_factor_recovery_codes ?? [];
+            $normalized = Str::upper(preg_replace('/\s+/', '', $code) ?? '');
+            $match = collect($codes)->search(fn ($candidate) => Str::upper((string) $candidate) === $normalized);
+            if ($match === false) {
+                return back()->withErrors(['code' => 'The two-factor or recovery code is invalid.']);
+            }
+            $remaining = collect($codes)->values()->all();
+            unset($remaining[$match]);
+            $user->forceFill(['two_factor_recovery_codes' => array_values($remaining)])->save();
         }
 
         auth()->login($user);
@@ -240,6 +266,10 @@ Route::get('/resume/share/{token}', function (string $token) {
 
 Route::get('/resume/{slug}/print', function (string $slug, ResumeManager $resumes) {
     $variant = DB::table('resume_variants')->where('slug', $slug)->where('visibility', 'public')->firstOrFail();
+    try {
+        app(AnalyticsManager::class)->trackResumeDownload((int) $variant->id);
+    } catch (\Throwable) {
+    }
 
     return $resumes->pdfResponse((int) $variant->id);
 })->name('resume.print');
@@ -276,6 +306,11 @@ Route::get('/{slug}', function (string $slug, Request $request) {
     $page = DB::table('pages')->where('slug', $slug)->where('status', 'published')->firstOrFail();
     if ($page->password_hash && ! Hash::check((string) $request->session()->get('page-password-'.$page->id), $page->password_hash)) {
         return view('public.password', ['page' => $page]);
+    }
+
+    try {
+        app(AnalyticsManager::class)->trackPageView($page, $request);
+    } catch (\Throwable) {
     }
 
     return view('public.page', ['page' => $page, 'content' => BuilderDocument::render(json_decode($page->builder_json, true) ?: BuilderDocument::empty($page->title))]);

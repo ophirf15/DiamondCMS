@@ -17,6 +17,8 @@ export default defineConfig({
                 'resources/js/admin.ts',
                 'resources/js/installer.ts',
                 'resources/js/auth.ts',
+                'resources/js/public.ts',
+                'resources/js/live.ts',
             ],
             refresh: true,
             fonts: [

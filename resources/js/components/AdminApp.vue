@@ -5,17 +5,24 @@ import {
     ArrowLeft,
     Briefcase,
     ExternalLink,
-    Eye,
     FileText,
+    FormInput,
     Images,
     LayoutDashboard,
     LayoutTemplate,
+    Layers,
     LogOut,
+    Menu,
     Palette,
     Pencil,
     Plus,
     Redo2,
     Save,
+    Search,
+    Settings,
+    Shield,
+    Sparkles,
+    Server,
     Undo2,
     Upload,
     Trash2,
@@ -37,9 +44,26 @@ import {
 } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Toaster } from '@/components/ui/sonner'
+import ActionToastHost from '@/components/ui/ActionToastHost.vue'
 import { toast } from 'vue-sonner'
+import { showActionToast } from '@/lib/actionToast'
+import { uploadMediaFile } from '@/lib/mediaUpload'
 import BuilderBlockView, { type BuilderBlock } from '@/components/builder/BuilderBlockView.vue'
+import PublicSiteChrome, { type ChromeConfig, type MenuItem as ChromeMenuItem } from '@/components/builder/PublicSiteChrome.vue'
 import { SECTION_KITS } from '@/components/builder/sectionKits'
+import SettingsPanel from '@/components/admin/SettingsPanel.vue'
+import ThemePanel from '@/components/admin/ThemePanel.vue'
+import TemplatesPanel from '@/components/admin/TemplatesPanel.vue'
+import MediaPanel, { type MediaItem } from '@/components/admin/MediaPanel.vue'
+import TrashPanel from '@/components/admin/TrashPanel.vue'
+import MenusPanel from '@/components/admin/MenusPanel.vue'
+import FormsPanel from '@/components/admin/FormsPanel.vue'
+import AccountPanel from '@/components/admin/AccountPanel.vue'
+import ResumesPanel from '@/components/admin/ResumesPanel.vue'
+import PortfolioPanel from '@/components/admin/PortfolioPanel.vue'
+import SeoPanel from '@/components/admin/SeoPanel.vue'
+import AiPanel from '@/components/admin/AiPanel.vue'
+import SystemPanel from '@/components/admin/SystemPanel.vue'
 
 const brandLogo = '/brand/logo-primary-gold.svg'
 
@@ -47,6 +71,7 @@ type BlockType = string
 type BuilderDocument = {
     schema: number
     title: string
+    meta?: { shell?: string; preview_theme?: string; blurb?: string }
     blocks: BuilderBlock[]
 }
 
@@ -61,7 +86,17 @@ type Page = {
 type RegistryBlock = {
     type: BlockType
     label: string
-    defaults: Record<string, string | number | boolean>
+    defaults: Record<string, unknown>
+}
+
+type AnalyticsSummary = {
+    page_views_today: number
+    page_views_7d: number
+    unique_visitors_7d: number
+    resume_downloads: number
+    resume_downloads_7d: number
+    top_pages: { page_id: number | null, path: string, title: string, visits: number }[]
+    daily_views: { day: string, visits: number }[]
 }
 
 type Dashboard = {
@@ -69,6 +104,7 @@ type Dashboard = {
     published: number
     drafts: number
     media: number
+    analytics?: AnalyticsSummary
 }
 
 type TemplateRow = {
@@ -79,13 +115,24 @@ type TemplateRow = {
     builder_json: string | BuilderDocument
 }
 
-type NavId = 'dashboard' | 'pages' | 'media' | 'design' | 'resumes'
+type NavId = 'dashboard' | 'pages' | 'media' | 'templates' | 'theme' | 'menus' | 'forms' | 'settings' | 'resumes' | 'portfolio' | 'account' | 'seo' | 'ai' | 'system' | 'trash'
 type EditorMode = 'browse' | 'edit'
 
 const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
 const activePanel = ref<NavId>('pages')
 const mode = ref<EditorMode>('browse')
-const dashboard = ref<Dashboard>({ pages: 0, published: 0, drafts: 0, media: 0 })
+const emptyAnalytics = (): AnalyticsSummary => ({
+    page_views_today: 0,
+    page_views_7d: 0,
+    unique_visitors_7d: 0,
+    resume_downloads: 0,
+    resume_downloads_7d: 0,
+    top_pages: [],
+    daily_views: [],
+})
+
+const dashboard = ref<Dashboard>({ pages: 0, published: 0, drafts: 0, media: 0, analytics: emptyAnalytics() })
+const pageActionBusy = ref<number | null>(null)
 const pages = ref<Page[]>([])
 const registry = ref<RegistryBlock[]>([])
 const selectedPage = ref<Page | null>(null)
@@ -93,33 +140,50 @@ const documentState = ref<BuilderDocument>(emptyDocument('Untitled page'))
 const selectedBlock = ref<BuilderBlock | null>(null)
 const history = ref<BuilderDocument[]>([])
 const future = ref<BuilderDocument[]>([])
-const mediaFiles = ref<unknown[]>([])
+const mediaFiles = ref<MediaItem[]>([])
 const templates = ref<TemplateRow[]>([])
-const resumeName = ref('')
 const showNewPage = ref(false)
 const newPageTitle = ref('')
 const creatingPage = ref(false)
 const saving = ref(false)
-
-const TEMPLATE_META: Record<string, { blurb: string, gradient: string }> = {
-    'dark-technical-resume': { blurb: 'Dark sidebar résumé with strong typography.', gradient: 'linear-gradient(135deg,#0f172a,#134e4a)' },
-    'minimal-professional-resume': { blurb: 'Clean one-column résumé for traditional roles.', gradient: 'linear-gradient(135deg,#f8fafc,#d1fae5)' },
-    'creative-portfolio': { blurb: 'Bold hero and project grid for creative work.', gradient: 'linear-gradient(135deg,#1a221e,#a67c3d)' },
-    'property-management-professional': { blurb: 'Service-focused landing for PM professionals.', gradient: 'linear-gradient(135deg,#ecfdf5,#0d5c4d)' },
-    'developer-technical-portfolio': { blurb: 'Project-led site for engineers and builders.', gradient: 'linear-gradient(135deg,#111827,#3d9b82)' },
-    'photography-portfolio': { blurb: 'Image-forward gallery layout.', gradient: 'linear-gradient(135deg,#1c1917,#78716c)' },
-    'personal-biography': { blurb: 'Story-first about page with timeline sections.', gradient: 'linear-gradient(135deg,#fafaf9,#a8a29e)' },
-    'split-screen-resume': { blurb: 'Split profile and experience layout.', gradient: 'linear-gradient(90deg,#0d5c4d 50%,#f6f8f6 50%)' },
-    'editorial-case-study-portfolio': { blurb: 'Long-form case study storytelling.', gradient: 'linear-gradient(135deg,#f5f5f4,#57534e)' },
-    'modern-one-page-personal-site': { blurb: 'Single-page personal site with CTA sections.', gradient: 'linear-gradient(135deg,#e4e9e5,#0d5c4d)' },
-}
+const showMediaPicker = ref(false)
+const mediaPickerTarget = ref<{ field: 'src' } | { field: 'images', index: number } | null>(null)
+const uploadingImage = ref(false)
+const siteChrome = ref<ChromeConfig>({
+    headerStyle: 'classic',
+    footerStyle: 'branded',
+    buttonStyle: 'solid',
+    footerShowLogo: true,
+    footerShowSiteName: true,
+    footerTagline: '',
+    footerSocials: [],
+    footerSocialStyle: 'icons',
+})
+const siteName = ref('DiamondCMS')
+const siteLogo = ref('/brand/logo-primary-gold.svg')
+const headerMenu = ref<ChromeMenuItem[]>([])
+const footerMenu = ref<ChromeMenuItem[]>([])
+const pageShell = computed(() => {
+    const meta = documentState.value.meta as { shell?: string } | undefined
+    return meta?.shell || 'default'
+})
 
 const navItems: { id: NavId, label: string, icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'pages', label: 'Pages', icon: FileText },
+    { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+    { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'media', label: 'Media', icon: Images },
-    { id: 'design', label: 'Templates', icon: Palette },
+    { id: 'trash', label: 'Trash', icon: Trash2 },
+    { id: 'menus', label: 'Menus', icon: Menu },
+    { id: 'forms', label: 'Forms', icon: FormInput },
     { id: 'resumes', label: 'Resumes', icon: Briefcase },
+    { id: 'portfolio', label: 'Portfolio', icon: Layers },
+    { id: 'seo', label: 'SEO', icon: Search },
+    { id: 'ai', label: 'AI', icon: Sparkles },
+    { id: 'system', label: 'System', icon: Server },
+    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'account', label: 'Account', icon: Shield },
 ]
 
 const friendlyBlocks = computed(() => registry.value.filter((block) => !['html'].includes(block.type)))
@@ -150,7 +214,10 @@ async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
         ...options,
     })
     if (!response.ok) throw new Error(await response.text())
-    return (await response.json()) as T
+    if (response.status === 204) return undefined as T
+    const text = await response.text()
+    if (!text) return undefined as T
+    return JSON.parse(text) as T
 }
 
 function snapshot(): void {
@@ -197,13 +264,6 @@ function parseTemplateDocument(template: TemplateRow): BuilderDocument {
     const raw = typeof template.builder_json === 'string' ? JSON.parse(template.builder_json) as BuilderDocument : template.builder_json
     raw.blocks = ensureChildren(raw.blocks ?? [])
     return raw
-}
-
-function templateMeta(template: TemplateRow) {
-    return TEMPLATE_META[template.slug] ?? {
-        blurb: 'Starter layout you can customize visually.',
-        gradient: 'linear-gradient(135deg,#e4e9e5,#0d5c4d)',
-    }
 }
 
 function addBlock(block: RegistryBlock): void {
@@ -286,8 +346,49 @@ async function load(): Promise<void> {
         dashboard.value = await api<Dashboard>('/dashboard')
         pages.value = (await api<{ data: Page[] }>('/pages')).data
         registry.value = (await api<{ blocks: RegistryBlock[] }>('/builder/registry')).blocks
-        mediaFiles.value = (await api<{ data: unknown[] }>('/media')).data
+        mediaFiles.value = (await api<{ data: MediaItem[] }>('/media')).data
         templates.value = await api<TemplateRow[]>('/templates')
+
+        const design = await api<{
+            branding?: { logo?: string | null }
+            chrome?: Partial<ChromeConfig>
+            buttons?: { style?: string }
+        }>('/design')
+        siteChrome.value = {
+            headerStyle: design.chrome?.headerStyle || 'classic',
+            footerStyle: design.chrome?.footerStyle || 'branded',
+            buttonStyle: design.buttons?.style || design.chrome?.buttonStyle || 'solid',
+            footerShowLogo: design.chrome?.footerShowLogo ?? true,
+            footerShowSiteName: design.chrome?.footerShowSiteName ?? true,
+            footerTagline: design.chrome?.footerTagline || '',
+            footerShowCredit: design.chrome?.footerShowCredit ?? true,
+            footerCreditText: design.chrome?.footerCreditText || 'Powered by DiamondCMS',
+            footerCreditUrl: design.chrome?.footerCreditUrl || '',
+            footerSocials: design.chrome?.footerSocials || [],
+            footerSocialStyle: design.chrome?.footerSocialStyle || 'icons',
+        }
+        if (design.branding?.logo) siteLogo.value = design.branding.logo
+
+        const settingsRows = await api<Array<{ key: string, value: string }>>('/settings').catch(() => [])
+        const siteNameRow = settingsRows.find((row) => row.key === 'site_name')
+        if (siteNameRow?.value) {
+            try {
+                const parsed = JSON.parse(siteNameRow.value)
+                if (typeof parsed === 'string' && parsed) siteName.value = parsed
+            } catch {
+                siteName.value = siteNameRow.value
+            }
+        }
+
+        const menus = await api<Array<{ location: string, items?: Array<{ label?: string, url?: string, children?: unknown[] }> }>>('/menus').catch(() => [])
+        const flatten = (items: Array<{ label?: string, url?: string, children?: unknown[] }> = []): ChromeMenuItem[] =>
+            items.flatMap((item) => {
+                const row = item.label && item.url ? [{ label: item.label, url: item.url }] : []
+                const kids = Array.isArray(item.children) ? flatten(item.children as typeof items) : []
+                return [...row, ...kids]
+            })
+        headerMenu.value = flatten(menus.find((m) => m.location === 'header')?.items)
+        footerMenu.value = flatten(menus.find((m) => m.location === 'footer')?.items)
     }
     catch (error) {
         toast.error(error instanceof Error ? error.message : 'Could not load admin')
@@ -310,7 +411,13 @@ function closeEditor(): void {
     selectedBlock.value = null
 }
 
-async function createPage(fromTemplate?: TemplateRow): Promise<void> {
+async function useTemplate(template: TemplateRow, event?: Event): Promise<void> {
+    newPageTitle.value = template.name
+    showNewPage.value = false
+    await createPage(template, event)
+}
+
+async function createPage(fromTemplate?: TemplateRow, event?: Event): Promise<void> {
     const title = newPageTitle.value.trim() || fromTemplate?.name || 'Untitled page'
     creatingPage.value = true
     try {
@@ -329,11 +436,11 @@ async function createPage(fromTemplate?: TemplateRow): Promise<void> {
         showNewPage.value = false
         newPageTitle.value = ''
         openEditor(page)
-        toast.success('Page created — start editing')
+        showActionToast(event, 'Page created — start editing')
         await refreshCounts()
     }
     catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Could not create page')
+        showActionToast(event, error instanceof Error ? error.message : 'Could not create page', 'error')
     }
     finally {
         creatingPage.value = false
@@ -369,50 +476,127 @@ async function savePage(statusOverride?: string): Promise<void> {
 }
 
 async function refreshCounts(): Promise<void> {
-    dashboard.value = await api<Dashboard>('/dashboard')
+    const payload = await api<Dashboard>('/dashboard')
+    dashboard.value = {
+        ...payload,
+        analytics: payload.analytics ?? emptyAnalytics(),
+    }
 }
 
-async function uploadMedia(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) return
-    const form = new FormData()
-    form.append('file', file)
-    const response = await fetch('/admin/api/media', {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json' },
-        body: form,
-    })
-    if (!response.ok) {
-        toast.error(await response.text())
+async function setPageStatus(page: Page, status: 'draft' | 'published', event?: Event): Promise<void> {
+    pageActionBusy.value = page.id
+    try {
+        const updated = await api<Page>(`/pages/${page.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status }),
+        })
+        pages.value = pages.value.map((candidate) => (candidate.id === updated.id ? updated : candidate))
+        if (selectedPage.value?.id === updated.id) {
+            selectedPage.value = updated
+        }
+        showActionToast(event, status === 'published' ? 'Page published' : 'Page unpublished')
+        await refreshCounts()
+    }
+    catch (error) {
+        showActionToast(event, error instanceof Error ? error.message : 'Could not update page', 'error')
+    }
+    finally {
+        pageActionBusy.value = null
+    }
+}
+
+async function deletePage(page: Page, event?: Event): Promise<void> {
+    if (!confirm(`Delete “${page.title}”? It will be archived and removed from the public site.`)) {
         return
     }
-    mediaFiles.value = (await api<{ data: unknown[] }>('/media')).data
-    toast.success('Uploaded')
+    pageActionBusy.value = page.id
+    try {
+        await api(`/pages/${page.id}`, { method: 'DELETE' })
+        pages.value = pages.value.filter((candidate) => candidate.id !== page.id)
+        if (selectedPage.value?.id === page.id) {
+            closeEditor()
+        }
+        showActionToast(event, 'Moved to trash')
+        await refreshCounts()
+    }
+    catch (error) {
+        showActionToast(event, error instanceof Error ? error.message : 'Could not delete page', 'error')
+    }
+    finally {
+        pageActionBusy.value = null
+    }
 }
 
-async function seedTemplates(): Promise<void> {
-    await api('/templates/seed', { method: 'POST', body: '{}' })
+async function onTemplatesSeeded(): Promise<void> {
     templates.value = await api<TemplateRow[]>('/templates')
-    toast.success('Starter templates ready')
-}
-
-async function useTemplate(template: TemplateRow): Promise<void> {
-    newPageTitle.value = template.name
-    showNewPage.value = false
-    await createPage(template)
-}
-
-async function createResume(): Promise<void> {
-    if (!resumeName.value.trim()) return
-    await api('/resumes', { method: 'POST', body: JSON.stringify({ name: resumeName.value.trim() }) })
-    resumeName.value = ''
-    toast.success('Resume profile created')
 }
 
 function openNewPageDialog(): void {
     newPageTitle.value = ''
     showNewPage.value = true
+}
+
+function openMediaPicker(target: { field: 'src' } | { field: 'images', index: number } = { field: 'src' }): void {
+    mediaPickerTarget.value = target
+    showMediaPicker.value = true
+}
+
+function pickMedia(item: MediaItem): void {
+    const target = mediaPickerTarget.value || { field: 'src' as const }
+    const url = item.url || `/storage/${item.path}`
+
+    if (target.field === 'images' && selectedBlock.value?.type === 'gallery-grid') {
+        snapshot()
+        const images = Array.isArray(selectedBlock.value.props.images)
+            ? [...selectedBlock.value.props.images as Array<Record<string, unknown>>]
+            : []
+        while (images.length <= target.index) {
+            images.push({ src: '', alt: '' })
+        }
+        images[target.index] = {
+            ...images[target.index],
+            src: url,
+            alt: (images[target.index]?.alt as string) || item.alt_text || item.original_name,
+        }
+        selectedBlock.value.props.images = images
+    } else if (selectedBlock.value) {
+        snapshot()
+        selectedBlock.value.props.src = url
+        if (!selectedBlock.value.props.alt) {
+            selectedBlock.value.props.alt = item.alt_text || item.original_name
+        }
+    }
+
+    showMediaPicker.value = false
+    mediaPickerTarget.value = null
+    toast.success('Image selected')
+}
+
+async function onImageDropFiles(block: BuilderBlock, files: File[]): Promise<void> {
+    const file = files[0]
+    if (!file) return
+    selectedBlock.value = block
+    uploadingImage.value = true
+    try {
+        snapshot()
+        const uploaded = await uploadMediaFile(csrf, file)
+        block.props.src = uploaded.url
+        if (!block.props.alt) {
+            block.props.alt = uploaded.alt_text || uploaded.original_name
+        }
+        mediaFiles.value = (await api<{ data: MediaItem[] }>('/media')).data
+        toast.success('Image uploaded')
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Upload failed')
+    } finally {
+        uploadingImage.value = false
+    }
+}
+
+async function onTrashChanged(): Promise<void> {
+    pages.value = (await api<{ data: Page[] }>('/pages')).data
+    mediaFiles.value = (await api<{ data: MediaItem[] }>('/media')).data
+    await refreshCounts()
 }
 
 watch(activePanel, (panel) => {
@@ -424,7 +608,10 @@ onMounted(load)
 
 <template>
     <div class="bg-background text-foreground flex min-h-screen">
-        <Toaster rich-colors position="bottom-right" close-button />
+        <Teleport to="body">
+            <Toaster rich-colors position="bottom-right" close-button class="dc-admin-toaster" />
+        </Teleport>
+        <ActionToastHost />
 
         <aside
             v-if="mode === 'browse'"
@@ -481,6 +668,68 @@ onMounted(load)
                         </CardHeader>
                     </Card>
                 </div>
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <Card v-for="stat in [
+                        { label: 'Views today', value: dashboard.analytics?.page_views_today ?? 0 },
+                        { label: 'Views (7 days)', value: dashboard.analytics?.page_views_7d ?? 0 },
+                        { label: 'Unique visitors (7d)', value: dashboard.analytics?.unique_visitors_7d ?? 0 },
+                        { label: 'Resume downloads', value: dashboard.analytics?.resume_downloads ?? 0 },
+                    ]" :key="stat.label">
+                        <CardHeader class="pb-2">
+                            <CardDescription>{{ stat.label }}</CardDescription>
+                            <CardTitle class="text-3xl">{{ stat.value }}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                </div>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Most visited pages</CardTitle>
+                            <CardDescription>Last 30 days · local analytics only</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ul v-if="(dashboard.analytics?.top_pages?.length ?? 0) > 0" class="space-y-2 text-sm">
+                                <li
+                                    v-for="row in dashboard.analytics?.top_pages"
+                                    :key="`${row.page_id}-${row.path}`"
+                                    class="flex items-center justify-between gap-3 border-b py-2 last:border-0"
+                                >
+                                    <span class="min-w-0 truncate">
+                                        <span class="font-medium">{{ row.title }}</span>
+                                        <span class="text-muted-foreground ml-2">{{ row.path }}</span>
+                                    </span>
+                                    <span class="tabular-nums font-medium">{{ row.visits }}</span>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted-foreground text-sm">No page visits recorded yet. Open your live site to start collecting local analytics.</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Views this week</CardTitle>
+                            <CardDescription>{{ dashboard.analytics?.resume_downloads_7d ?? 0 }} résumé downloads in the last 7 days</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ul v-if="(dashboard.analytics?.daily_views?.length ?? 0) > 0" class="space-y-2 text-sm">
+                                <li
+                                    v-for="row in dashboard.analytics?.daily_views"
+                                    :key="row.day"
+                                    class="flex items-center justify-between gap-3"
+                                >
+                                    <span class="text-muted-foreground">{{ row.day }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span
+                                            class="bg-primary/80 h-2 rounded-sm"
+                                            :style="{ width: `${Math.max(8, Math.round((row.visits / Math.max(...(dashboard.analytics?.daily_views.map((d) => d.visits) || [1]))) * 120))}px` }"
+                                        />
+                                        <span class="w-8 text-right tabular-nums">{{ row.visits }}</span>
+                                    </div>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted-foreground text-sm">Daily view chart will appear after the first visits.</p>
+                        </CardContent>
+                    </Card>
+                </div>
                 <Card>
                     <CardHeader>
                         <CardTitle>Quick start</CardTitle>
@@ -491,9 +740,13 @@ onMounted(load)
                             <Plus class="size-4" />
                             <span>New page</span>
                         </Button>
-                        <Button variant="outline" class="gap-2" @click="activePanel = 'design'">
-                            <Palette class="size-4" />
+                        <Button variant="outline" class="gap-2" @click="activePanel = 'templates'">
+                            <LayoutTemplate class="size-4" />
                             <span>Browse templates</span>
+                        </Button>
+                        <Button variant="outline" class="gap-2" @click="activePanel = 'settings'">
+                            <Settings class="size-4" />
+                            <span>Settings</span>
                         </Button>
                     </CardContent>
                 </Card>
@@ -517,7 +770,7 @@ onMounted(load)
                                 <TableHead>Title</TableHead>
                                 <TableHead>Address</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead class="w-[140px]" />
+                                <TableHead class="w-[280px]" />
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -533,10 +786,40 @@ onMounted(load)
                                     <Badge :variant="page.status === 'published' ? 'default' : 'secondary'">{{ page.status }}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                    <Button size="sm" variant="outline" class="gap-1.5" @click="openEditor(page)">
-                                        <Pencil class="size-3.5" />
-                                        <span>Edit</span>
-                                    </Button>
+                                    <div class="flex flex-wrap justify-end gap-1.5">
+                                        <Button size="sm" variant="outline" class="gap-1.5" @click="openEditor(page)">
+                                            <Pencil class="size-3.5" />
+                                            <span>Edit</span>
+                                        </Button>
+                                        <Button
+                                            v-if="page.status === 'published'"
+                                            size="sm"
+                                            variant="outline"
+                                            :disabled="pageActionBusy === page.id"
+                                            @click="setPageStatus(page, 'draft', $event)"
+                                        >
+                                            Unpublish
+                                        </Button>
+                                        <Button
+                                            v-else
+                                            size="sm"
+                                            variant="outline"
+                                            :disabled="pageActionBusy === page.id"
+                                            @click="setPageStatus(page, 'published', $event)"
+                                        >
+                                            Publish
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            class="text-destructive hover:text-destructive gap-1.5"
+                                            :disabled="pageActionBusy === page.id"
+                                            @click="deletePage(page, $event)"
+                                        >
+                                            <Trash2 class="size-3.5" />
+                                            <span>Delete</span>
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         </TableBody>
@@ -544,69 +827,82 @@ onMounted(load)
                 </Card>
             </section>
 
-            <section v-else-if="activePanel === 'media'" class="space-y-4">
-                <div>
-                    <h1 class="text-3xl font-semibold tracking-tight">Media</h1>
-                    <p class="text-muted-foreground text-sm">Upload images and files you can place on pages.</p>
-                </div>
-                <Card>
-                    <CardContent class="space-y-4 pt-6">
-                        <Input type="file" accept="image/*,.pdf" @change="uploadMedia" />
-                        <p class="text-muted-foreground text-sm">{{ mediaFiles.length }} file(s) in your library</p>
-                    </CardContent>
-                </Card>
-            </section>
+            <MediaPanel
+                v-else-if="activePanel === 'media'"
+                :items="mediaFiles"
+                :csrf="csrf"
+                :api="api"
+                @refreshed="mediaFiles = $event; refreshCounts()"
+            />
 
-            <section v-else-if="activePanel === 'design'" class="space-y-4">
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <h1 class="text-3xl font-semibold tracking-tight">Templates</h1>
-                        <p class="text-muted-foreground text-sm">Preview a look, then start a new editable page from it.</p>
-                    </div>
-                    <Button variant="outline" @click="seedTemplates">Refresh starter set</Button>
-                </div>
-                <div v-if="templates.length === 0" class="rounded-xl border border-dashed p-10 text-center">
-                    <p class="text-muted-foreground mb-4 text-sm">No templates installed yet.</p>
-                    <Button @click="seedTemplates">Install starter templates</Button>
-                </div>
-                <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <Card v-for="template in templates" :key="template.id" class="overflow-hidden">
-                        <div class="h-36 w-full" :style="{ background: templateMeta(template).gradient }" />
-                        <CardHeader class="space-y-2">
-                            <div class="flex items-center justify-between gap-2">
-                                <CardTitle class="text-base">{{ template.name }}</CardTitle>
-                                <Badge variant="secondary">{{ template.category }}</Badge>
-                            </div>
-                            <CardDescription>{{ templateMeta(template).blurb }}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Button class="w-full gap-2" @click="useTemplate(template)">
-                                <Eye class="size-4" />
-                                <span>Use this template</span>
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            </section>
+            <TrashPanel
+                v-else-if="activePanel === 'trash'"
+                :api="api"
+                @changed="onTrashChanged"
+            />
 
-            <section v-else class="space-y-4">
-                <div>
-                    <h1 class="text-3xl font-semibold tracking-tight">Resumes</h1>
-                    <p class="text-muted-foreground text-sm">Create a résumé profile you can place on pages.</p>
-                </div>
-                <Card class="max-w-lg">
-                    <CardContent class="space-y-4 pt-6">
-                        <div class="space-y-2">
-                            <Label for="resume-name">Profile name</Label>
-                            <Input id="resume-name" v-model="resumeName" placeholder="Primary résumé" />
-                        </div>
-                        <Button class="gap-2" @click="createResume">
-                            <Plus class="size-4" />
-                            <span>Create profile</span>
-                        </Button>
-                    </CardContent>
-                </Card>
-            </section>
+            <TemplatesPanel
+                v-else-if="activePanel === 'templates'"
+                :templates="templates"
+                :api="api"
+                @seeded="onTemplatesSeeded"
+                @use="(template, event) => useTemplate(template, event)"
+            />
+
+            <ThemePanel
+                v-else-if="activePanel === 'theme'"
+                :api="api"
+            />
+
+            <MenusPanel
+                v-else-if="activePanel === 'menus'"
+                :api="api"
+                :pages="pages"
+            />
+
+            <FormsPanel
+                v-else-if="activePanel === 'forms'"
+                :api="api"
+            />
+
+            <SettingsPanel
+                v-else-if="activePanel === 'settings'"
+                :api="api"
+                :pages="pages"
+            />
+
+            <ResumesPanel
+                v-else-if="activePanel === 'resumes'"
+                :api="api"
+            />
+
+            <PortfolioPanel
+                v-else-if="activePanel === 'portfolio'"
+                :api="api"
+            />
+
+            <SeoPanel
+                v-else-if="activePanel === 'seo'"
+                :api="api"
+                :pages="pages"
+                @refreshed="load"
+            />
+
+            <AiPanel
+                v-else-if="activePanel === 'ai'"
+                :api="api"
+                @refreshed="load"
+            />
+
+            <SystemPanel
+                v-else-if="activePanel === 'system'"
+                :api="api"
+            />
+
+            <AccountPanel
+                v-else-if="activePanel === 'account'"
+                :api="api"
+            />
         </main>
 
         <!-- Full page editor -->
@@ -626,13 +922,45 @@ onMounted(load)
                         <Save class="size-4" />
                         <span>Save draft</span>
                     </Button>
-                    <Button size="sm" class="gap-1.5" :disabled="saving" @click="savePage('published')">
+                    <Button
+                        v-if="selectedPage?.status === 'published'"
+                        size="sm"
+                        variant="outline"
+                        class="gap-1.5"
+                        :disabled="saving || pageActionBusy === selectedPage?.id"
+                        @click="selectedPage && setPageStatus(selectedPage, 'draft', $event)"
+                    >
+                        Unpublish
+                    </Button>
+                    <Button
+                        v-else
+                        size="sm"
+                        class="gap-1.5"
+                        :disabled="saving"
+                        @click="savePage('published')"
+                    >
                         <Upload class="size-4" />
                         <span>Publish</span>
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        class="text-destructive hover:text-destructive gap-1.5"
+                        :disabled="!selectedPage || pageActionBusy === selectedPage?.id"
+                        @click="selectedPage && deletePage(selectedPage, $event)"
+                    >
+                        <Trash2 class="size-4" />
+                        <span>Delete</span>
                     </Button>
                     <Button size="sm" variant="outline" class="gap-1.5" @click="openPreview">
                         <ExternalLink class="size-4" />
                         <span>Preview</span>
+                    </Button>
+                    <Button size="sm" variant="secondary" class="gap-1.5" as-child>
+                        <a :href="`/admin/live/${selectedPage?.id}`">
+                            <Pencil class="size-4" />
+                            <span>Edit live</span>
+                        </a>
                     </Button>
                 </div>
             </header>
@@ -696,34 +1024,47 @@ onMounted(load)
                     </div>
                 </aside>
 
-                <section class="bg-muted/40 min-w-0 overflow-auto p-4 md:p-8">
-                    <div class="bg-background mx-auto min-h-[75vh] max-w-4xl rounded-2xl border shadow-sm">
-                        <div class="border-b px-6 py-4">
-                            <p class="text-muted-foreground text-xs tracking-wide uppercase">Live canvas</p>
-                            <h2 class="text-xl font-semibold">{{ pageTitle }}</h2>
-                            <p class="text-muted-foreground mt-1 text-sm">Click text to edit inline. Drag sections to reorder.</p>
-                        </div>
-                        <VueDraggable
-                            v-model="documentState.blocks"
-                            class="space-y-4 p-4 md:p-8"
-                            group="builder-blocks"
-                            :animation="180"
-                            @end="snapshot"
+                <section class="min-w-0 overflow-auto p-0 md:p-4" style="background: var(--dc-site-bg, var(--dc-bg)); color: var(--dc-fg)">
+                    <div
+                        class="mx-auto min-h-[75vh] max-w-6xl overflow-hidden rounded-2xl border shadow-sm"
+                        :class="`dc-btn-${siteChrome.buttonStyle}`"
+                        :data-dc-button="siteChrome.buttonStyle"
+                        style="background: var(--dc-site-bg, var(--dc-bg)); color: var(--dc-fg); border-color: var(--dc-line)"
+                    >
+                        <PublicSiteChrome
+                            :shell="pageShell"
+                            :site-name="siteName"
+                            :logo-url="siteLogo"
+                            :menu-items="headerMenu"
+                            :footer-items="footerMenu"
+                            :chrome="siteChrome"
+                            :public-url="selectedPage ? `/${selectedPage.slug}` : '/'"
                         >
-                            <BuilderBlockView
-                                v-for="block in documentState.blocks"
-                                :key="block.id"
-                                :block="block"
-                                :selected-id="selectedBlock?.id ?? null"
-                                @select="selectedBlock = $event"
-                                @update="snapshot"
-                                @remove="deleteBlock"
-                                @add-child="addChildTo"
-                            />
-                        </VueDraggable>
-                        <div v-if="documentState.blocks.length === 0" class="text-muted-foreground p-12 text-center text-sm">
-                            Add a section kit from the left to start designing this page.
-                        </div>
+                            <VueDraggable
+                                v-model="documentState.blocks"
+                                class="dc-live-blocks space-y-1 p-2 md:p-4"
+                                group="builder-blocks"
+                                :animation="180"
+                                @end="snapshot"
+                            >
+                                <BuilderBlockView
+                                    v-for="block in documentState.blocks"
+                                    :key="block.id"
+                                    :block="block"
+                                    :selected-id="selectedBlock?.id ?? null"
+                                    :live-mode="true"
+                                    @select="selectedBlock = $event"
+                                    @update="snapshot"
+                                    @remove="deleteBlock"
+                                    @add-child="addChildTo"
+                                    @drop-files="onImageDropFiles"
+                                    @pick-media="(block) => { selectedBlock = block; openMediaPicker({ field: 'src' }) }"
+                                />
+                            </VueDraggable>
+                            <div v-if="documentState.blocks.length === 0" class="p-12 text-center text-sm" style="color: var(--dc-muted)">
+                                Add a section kit from the left to start designing this page.
+                            </div>
+                        </PublicSiteChrome>
                     </div>
                 </section>
 
@@ -736,18 +1077,12 @@ onMounted(load)
                             </p>
                         </div>
                         <template v-if="selectedBlock">
-                            <div
-                                v-for="(value, key) in selectedBlock.props"
-                                :key="key"
-                                class="space-y-2"
-                            >
-                                <Label :for="`prop-${key}`" class="capitalize">{{ String(key).replace(/_/g, ' ') }}</Label>
-                                <Input
-                                    :id="`prop-${key}`"
-                                    :model-value="String(value ?? '')"
-                                    @update:model-value="(next) => { selectedBlock!.props[key] = next; snapshot() }"
-                                />
-                            </div>
+                            <p v-if="uploadingImage" class="text-muted-foreground text-xs">Uploading image…</p>
+                            <BlockPropsEditor
+                                :block="selectedBlock"
+                                @change="snapshot"
+                                @pick-media="openMediaPicker"
+                            />
                             <Button variant="destructive" size="sm" class="gap-1.5" @click="deleteBlock(selectedBlock)">
                                 <Trash2 class="size-3.5" />
                                 <span>Remove</span>
@@ -790,6 +1125,32 @@ onMounted(load)
                             <span>{{ creatingPage ? 'Creating…' : 'Create & edit' }}</span>
                         </Button>
                     </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        <!-- Media picker modal -->
+        <div
+            v-if="showMediaPicker"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            @click.self="showMediaPicker = false"
+        >
+            <Card class="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden shadow-xl">
+                <CardHeader class="flex-row items-center justify-between space-y-0">
+                    <CardTitle>Choose image</CardTitle>
+                    <Button variant="ghost" size="icon-sm" @click="showMediaPicker = false">
+                        <X class="size-4" />
+                    </Button>
+                </CardHeader>
+                <CardContent class="overflow-auto">
+                    <MediaPanel
+                        :items="mediaFiles"
+                        :csrf="csrf"
+                        :api="api"
+                        selectable
+                        @refreshed="mediaFiles = $event"
+                        @select="pickMedia"
+                    />
                 </CardContent>
             </Card>
         </div>

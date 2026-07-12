@@ -71,6 +71,31 @@ final class PortfolioManager
         );
     }
 
+    public function softDelete(int $projectId): void
+    {
+        DB::table('projects')->where('id', $projectId)->whereNull('deleted_at')->update([
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function restore(int $projectId): void
+    {
+        DB::table('projects')->where('id', $projectId)->whereNotNull('deleted_at')->update([
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function forceDelete(int $projectId): void
+    {
+        DB::table('project_relations')
+            ->where('project_id', $projectId)
+            ->orWhere('related_project_id', $projectId)
+            ->delete();
+        DB::table('projects')->where('id', $projectId)->delete();
+    }
+
     /** @return Collection<int, object> */
     public function publicProjects(array $filters = []): Collection
     {

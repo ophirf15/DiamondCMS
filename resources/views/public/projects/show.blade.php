@@ -8,6 +8,9 @@
         @if (! empty($project->skills))
             <p><strong>Skills:</strong> {{ implode(', ', $project->skills) }}</p>
         @endif
+        @if ($project->url)
+            <p><a class="dc-button" href="{{ $project->url }}" rel="noopener noreferrer" target="_blank">Visit project</a></p>
+        @endif
         @if ($project->case_study)
             <div class="dc-text">{!! nl2br(e($project->case_study)) !!}</div>
         @endif

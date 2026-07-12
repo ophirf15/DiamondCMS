@@ -4,7 +4,7 @@ function id(): string {
     return crypto.randomUUID()
 }
 
-function block(type: string, props: Record<string, string | number | boolean> = {}, children?: BuilderBlock[]): BuilderBlock {
+function block(type: string, props: Record<string, unknown> = {}, children?: BuilderBlock[]): BuilderBlock {
     return { id: id(), type, props, children }
 }
 
@@ -24,6 +24,60 @@ export const SECTION_KITS: SectionKit[] = [
             block('heading', { level: 1, text: 'Build a site that feels like you' }),
             block('text', { text: 'Share your work, story, and résumé in one polished personal website — no code required.' }),
             block('button', { text: 'See my work', url: '/projects' }),
+        ]),
+    },
+    {
+        id: 'hero-split',
+        label: 'About split hero',
+        description: 'Portrait with name overlay beside bio and socials.',
+        build: () => block('section', { padding: '4rem 1.5rem' }, [
+            block('columns', { columns: 2 }, [
+                block('section', { padding: '0.5rem' }, [
+                    block('image', { src: '', alt: 'Portrait' }),
+                    block('heading', { level: 2, text: 'Your Name' }),
+                    block('text', { text: 'Designer & Developer' }),
+                ]),
+                block('section', { padding: '0.5rem' }, [
+                    block('heading', { level: 2, text: 'About Me' }),
+                    block('text', { text: 'A short introduction about your background, values, and the kind of work you love doing.' }),
+                    block('heading', { level: 3, text: 'Connect With Me' }),
+                    block('social-links', {
+                        variant: 'icons-labels',
+                        items: [
+                            { label: 'X', url: '#', icon: 'x' },
+                            { label: 'LinkedIn', url: '#', icon: 'linkedin' },
+                            { label: 'Email', url: 'mailto:hello@example.com', icon: 'email' },
+                        ],
+                    }),
+                ]),
+            ]),
+        ]),
+    },
+    {
+        id: 'hero-availability',
+        label: 'Availability hero',
+        description: 'Badge, role accent, stats, dual CTAs, and portrait.',
+        build: () => block('section', { padding: '5rem 1.5rem' }, [
+            block('columns', { columns: 2 }, [
+                block('section', { padding: '0.5rem' }, [
+                    block('text', { text: '● Available for new projects' }),
+                    block('heading', { level: 1, text: 'Hello, I’m Your Name' }),
+                    block('text', { text: 'Applied AI Engineer & Software Developer' }),
+                    block('text', { text: 'Designing and building production-ready systems that solve real business problems.' }),
+                    block('stats-row', {
+                        items: [
+                            { value: '10+', label: 'Years' },
+                            { value: '4+', label: 'Applied AI' },
+                            { value: '100+', label: 'Projects' },
+                        ],
+                    }),
+                    block('button', { text: 'View My Work', url: '/projects' }),
+                    block('button', { text: "Let's Talk", url: '/contact' }),
+                ]),
+                block('section', { padding: '0.5rem' }, [
+                    block('image', { src: '', alt: 'Portrait' }),
+                ]),
+            ]),
         ]),
     },
     {

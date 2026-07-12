@@ -9,6 +9,7 @@
     @unless (app()->environment('testing'))
         @vite(['resources/css/app.css', 'resources/js/admin.ts'])
     @endunless
+    {!! \App\Domains\Design\Support\DesignManager::cssVariables() !!}
 </head>
 <body class="min-h-screen bg-background text-foreground antialiased" style="color-scheme: light">
     <div id="admin-app" data-boot='@json($boot ?? [])'>

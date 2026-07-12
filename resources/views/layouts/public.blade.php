@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? config('diamondcms.name') }}</title>
+    <title>{{ $title ?? diamondcms_site_name() }}</title>
     @include('partials.brand-head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {!! \App\Domains\Design\Support\DesignManager::cssVariables() !!}
@@ -12,17 +12,30 @@
 <body class="dc-site min-h-screen bg-background text-foreground antialiased">
     <header class="dc-header">
         <a class="dc-logo inline-flex items-center gap-2" href="{{ route('home') }}">
-            <x-brand-logo variant="currentColor" class="h-7 w-7 text-primary" />
-            <span>{{ config('diamondcms.name') }}</span>
+            <img src="{{ diamondcms_logo_url() }}" alt="" class="h-7 w-auto text-primary">
+            <span>{{ diamondcms_site_name() }}</span>
         </a>
-        <nav>
-            <a href="{{ route('login') }}">Admin</a>
+        <nav aria-label="Primary">
+            @php($headerItems = diamondcms_menu('header'))
+            @forelse ($headerItems as $item)
+                <a href="{{ $item['url'] }}">{{ $item['label'] }}</a>
+            @empty
+                {{-- Intentionally empty until menus are configured --}}
+            @endforelse
+            @auth
+                <a href="{{ url('/admin/dashboard') }}">Admin</a>
+            @endauth
         </nav>
     </header>
     <main>
         @yield('content')
     </main>
     <footer class="dc-footer">
+        <nav aria-label="Footer">
+            @foreach (diamondcms_menu('footer') as $item)
+                <a href="{{ $item['url'] }}">{{ $item['label'] }}</a>
+            @endforeach
+        </nav>
         <span>Powered by DiamondCMS {{ diamondcms_version() }}</span>
     </footer>
 </body>
