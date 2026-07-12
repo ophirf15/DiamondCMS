@@ -37,7 +37,7 @@ final class UpdateManager
     }
 
     /**
-     * @return array{repo: string, current: string, latest: string|null, newer: bool, notes: string, html_url: string|null, assets: array<int, array{name: string, url: string, size: int}>, checksum_url: string|null, zip_url: string|null}
+     * @return array{repo: string, current: string, latest: string|null, newer: bool, notes: string, html_url: string|null, assets: array<int, array{name: string, url: string, size: int}>, checksum_url: string|null, zip_url: string|null, zip_name: string|null}
      */
     public function checkLatest(): array
     {
