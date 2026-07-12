@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref, type Ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { GripVertical, Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { builderDraggableOptions } from '@/lib/builderDraggable'
+import { resolveSocialLinks, type SocialLinkRecord } from '@/lib/socialLinks'
 import BuilderBlockView from './BuilderBlockView.vue'
 import SocialBrandIcon from './SocialBrandIcon.vue'
 
@@ -37,6 +39,12 @@ const depth = computed(() => props.depth ?? 0)
 const isSelected = computed(() => props.selectedId === props.block.id)
 const interactive = computed(() => !props.readonly && !props.previewMode)
 const live = computed(() => !!props.liveMode)
+const socialLinksLibrary = inject<Ref<SocialLinkRecord[]>>('socialLinksLibrary', ref([]))
+const reorderEnabled = inject<Ref<boolean>>('builderReorderEnabled', ref(true))
+const builderDraggableBindings = computed(() => ({
+    ...builderDraggableOptions,
+    disabled: !reorderEnabled.value,
+}))
 const isContainer = computed(() => props.block.type === 'section' || props.block.type === 'columns')
 const isInlineLeaf = computed(() => live.value && ['button'].includes(props.block.type))
 
@@ -163,8 +171,10 @@ const statsItems = computed(() => {
 })
 
 const socialItems = computed(() => {
-    const items = asItems(props.block.props.items)
-    if (items.length) return items
+    const resolved = resolveSocialLinks(socialLinksLibrary.value, props.block.props)
+    if (resolved.length) {
+        return resolved
+    }
     return [
         { label: 'Email', url: 'mailto:hello@example.com', icon: 'email' },
         { label: 'LinkedIn', url: '#', icon: 'linkedin' },
@@ -204,7 +214,7 @@ const galleryImages = computed(() => {
             class="absolute -top-3 left-3 z-10 flex items-center gap-1 opacity-0 transition group-hover/block:opacity-100"
             :class="{ 'opacity-100': isSelected }"
         >
-            <Badge variant="secondary" class="gap-1 text-[10px] uppercase">
+            <Badge variant="secondary" class="dc-drag-handle gap-1 text-[10px] uppercase">
                 <GripVertical class="size-3" />
                 {{ block.type }}
             </Badge>
@@ -223,7 +233,7 @@ const galleryImages = computed(() => {
             class="dc-live-chrome"
             @click.stop
         >
-            <Badge variant="secondary" class="gap-1 text-[10px] uppercase">
+            <Badge variant="secondary" class="dc-drag-handle gap-1 text-[10px] uppercase">
                 <GripVertical class="size-3" />
                 {{ block.type }}
             </Badge>
@@ -251,7 +261,7 @@ const galleryImages = computed(() => {
                 v-model="block.children!"
                 :class="live ? 'dc-live-stack' : 'min-h-12 space-y-3'"
                 group="builder-blocks"
-                :animation="180"
+                v-bind="builderDraggableBindings"
                 @end="emit('update')"
             >
                 <BuilderBlockView
@@ -333,7 +343,7 @@ const galleryImages = computed(() => {
                 : { gridTemplateColumns: `repeat(${Math.max(1, Number(block.props.columns || 2))}, minmax(0, 1fr))` }"
             :data-dc-mobile-stack="live ? String(block.props.mobileStack || 'auto') : undefined"
             group="builder-blocks"
-            :animation="180"
+            v-bind="builderDraggableBindings"
             @end="emit('update')"
         >
             <BuilderBlockView

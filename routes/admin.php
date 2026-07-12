@@ -10,6 +10,7 @@ use App\Domains\Builder\Support\BuilderDocument;
 use App\Domains\Builder\Support\StarterTemplates;
 use App\Domains\Design\Support\DesignManager;
 use App\Domains\Design\Support\MenuManager;
+use App\Domains\Design\Support\SocialLinksManager;
 use App\Domains\Forms\Support\FormManager;
 use App\Domains\Installer\Support\InstallState;
 use App\Domains\Mail\Support\MailSettingsManager;
@@ -299,12 +300,14 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                     'footerShowCredit' => (bool) ($chrome['footerShowCredit'] ?? true),
                     'footerCreditText' => (string) ($chrome['footerCreditText'] ?? 'Powered by DiamondCMS'),
                     'footerCreditUrl' => (string) ($chrome['footerCreditUrl'] ?? ''),
-                    'footerSocials' => is_array($chrome['footerSocials'] ?? null) ? array_values($chrome['footerSocials']) : [],
+                    'footerSocials' => DesignManager::footerSocialItems(),
+                    'footerSocialLinkIds' => is_array($chrome['footerSocialLinkIds'] ?? null) ? array_values($chrome['footerSocialLinkIds']) : [],
                     'footerSocialStyle' => (string) ($chrome['footerSocialStyle'] ?? 'icons'),
                 ],
                 'visitorToggle' => DesignManager::visitorToggleEnabled(),
                 'themeDefault' => DesignManager::resolvedDefaultTheme(),
                 'themeLock' => DesignManager::themeLocked(),
+                'socialLinksLibrary' => SocialLinksManager::all(),
             ],
         ]);
     })->name('live');
@@ -544,6 +547,19 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             $menu->items = MenuManager::treeForMenu($id);
 
             return response()->json($menu);
+        });
+
+        Route::get('/social-links', fn () => response()->json(SocialLinksManager::all()));
+        Route::put('/social-links', function (Request $request) {
+            $data = $request->validate([
+                'links' => ['required', 'array'],
+                'links.*.id' => ['nullable', 'string', 'max:64'],
+                'links.*.label' => ['required', 'string', 'max:190'],
+                'links.*.url' => ['required', 'string', 'max:500'],
+                'links.*.icon' => ['nullable', 'string', 'max:64'],
+            ]);
+
+            return response()->json(SocialLinksManager::save($data['links']));
         });
 
         Route::get('/design', fn () => response()->json(DesignManager::tokens()));

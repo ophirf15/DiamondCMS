@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import {
     ArrowLeft,
@@ -20,6 +20,7 @@ import {
     Save,
     Search,
     Settings,
+    Share2,
     Shield,
     Sparkles,
     Server,
@@ -47,6 +48,8 @@ import { Toaster } from '@/components/ui/sonner'
 import ActionToastHost from '@/components/ui/ActionToastHost.vue'
 import { toast } from 'vue-sonner'
 import { apiErrorMessage } from '@/lib/apiErrorMessage'
+import { builderDraggableOptions } from '@/lib/builderDraggable'
+import { resolveFooterSocialLinks, type SocialLinkRecord } from '@/lib/socialLinks'
 import { uploadMediaFile } from '@/lib/mediaUpload'
 import BuilderBlockView, { type BuilderBlock } from '@/components/builder/BuilderBlockView.vue'
 import PublicSiteChrome, { type ChromeConfig, type MenuItem as ChromeMenuItem } from '@/components/builder/PublicSiteChrome.vue'
@@ -57,6 +60,7 @@ import TemplatesPanel from '@/components/admin/TemplatesPanel.vue'
 import MediaPanel, { type MediaItem } from '@/components/admin/MediaPanel.vue'
 import TrashPanel from '@/components/admin/TrashPanel.vue'
 import MenusPanel from '@/components/admin/MenusPanel.vue'
+import SocialLinksPanel from '@/components/admin/SocialLinksPanel.vue'
 import FormsPanel from '@/components/admin/FormsPanel.vue'
 import AccountPanel from '@/components/admin/AccountPanel.vue'
 import ResumesPanel from '@/components/admin/ResumesPanel.vue'
@@ -115,13 +119,17 @@ type TemplateRow = {
     builder_json: string | BuilderDocument
 }
 
-type NavId = 'dashboard' | 'pages' | 'media' | 'templates' | 'theme' | 'menus' | 'forms' | 'settings' | 'resumes' | 'portfolio' | 'account' | 'seo' | 'ai' | 'system' | 'trash'
+type NavId = 'dashboard' | 'pages' | 'media' | 'templates' | 'theme' | 'menus' | 'social' | 'forms' | 'settings' | 'resumes' | 'portfolio' | 'account' | 'seo' | 'ai' | 'system' | 'trash'
 type EditorMode = 'browse' | 'edit'
 
 const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
 const activePanel = ref<NavId>('pages')
 const mode = ref<EditorMode>('browse')
 const sidebarOpen = ref(false)
+const reorderEnabled = ref(typeof window !== 'undefined' ? window.matchMedia('(min-width: 801px)').matches : true)
+const socialLinksLibrary = ref<SocialLinkRecord[]>([])
+provide('socialLinksLibrary', socialLinksLibrary)
+provide('builderReorderEnabled', reorderEnabled)
 const emptyAnalytics = (): AnalyticsSummary => ({
     page_views_today: 0,
     page_views_7d: 0,
@@ -159,6 +167,7 @@ const siteChrome = ref<ChromeConfig>({
     footerShowSiteName: true,
     footerTagline: '',
     footerSocials: [],
+    footerSocialLinkIds: [],
     footerSocialStyle: 'icons',
 })
 const siteName = ref('DiamondCMS')
@@ -170,6 +179,40 @@ const pageShell = computed(() => {
     return meta?.shell || 'default'
 })
 
+const previewChrome = computed<ChromeConfig>(() => ({
+    ...siteChrome.value,
+    footerSocials: resolveFooterSocialLinks(
+        socialLinksLibrary.value,
+        siteChrome.value.footerSocialLinkIds,
+        siteChrome.value.footerSocials,
+    ),
+}))
+
+function onSocialLinksSaved(links: SocialLinkRecord[]): void {
+    socialLinksLibrary.value = links
+}
+
+function onThemeSaved(tokens: { chrome?: Partial<ChromeConfig>, buttons?: { style?: string } }): void {
+    const chrome = tokens.chrome
+    if (!chrome) return
+    siteChrome.value = {
+        ...siteChrome.value,
+        headerStyle: chrome.headerStyle ?? siteChrome.value.headerStyle,
+        mobileNav: chrome.mobileNav ?? siteChrome.value.mobileNav,
+        footerStyle: chrome.footerStyle ?? siteChrome.value.footerStyle,
+        footerShowLogo: chrome.footerShowLogo ?? siteChrome.value.footerShowLogo,
+        footerShowSiteName: chrome.footerShowSiteName ?? siteChrome.value.footerShowSiteName,
+        footerTagline: chrome.footerTagline ?? siteChrome.value.footerTagline,
+        footerShowCredit: chrome.footerShowCredit ?? siteChrome.value.footerShowCredit,
+        footerCreditText: chrome.footerCreditText ?? siteChrome.value.footerCreditText,
+        footerCreditUrl: chrome.footerCreditUrl ?? siteChrome.value.footerCreditUrl,
+        footerSocials: chrome.footerSocials ?? siteChrome.value.footerSocials,
+        footerSocialLinkIds: chrome.footerSocialLinkIds ?? siteChrome.value.footerSocialLinkIds,
+        footerSocialStyle: chrome.footerSocialStyle ?? siteChrome.value.footerSocialStyle,
+        buttonStyle: tokens.buttons?.style ?? siteChrome.value.buttonStyle,
+    }
+}
+
 const navItems: { id: NavId, label: string, icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'pages', label: 'Pages', icon: FileText },
@@ -178,6 +221,7 @@ const navItems: { id: NavId, label: string, icon: typeof LayoutDashboard }[] = [
     { id: 'media', label: 'Media', icon: Images },
     { id: 'trash', label: 'Trash', icon: Trash2 },
     { id: 'menus', label: 'Menus', icon: Menu },
+    { id: 'social', label: 'Social links', icon: Share2 },
     { id: 'forms', label: 'Forms', icon: FormInput },
     { id: 'resumes', label: 'Resumes', icon: Briefcase },
     { id: 'portfolio', label: 'Portfolio', icon: Layers },
@@ -385,8 +429,10 @@ async function load(): Promise<void> {
             footerCreditText: design.chrome?.footerCreditText || 'Powered by DiamondCMS',
             footerCreditUrl: design.chrome?.footerCreditUrl || '',
             footerSocials: design.chrome?.footerSocials || [],
+            footerSocialLinkIds: design.chrome?.footerSocialLinkIds || [],
             footerSocialStyle: design.chrome?.footerSocialStyle || 'icons',
         }
+        socialLinksLibrary.value = await api<SocialLinkRecord[]>('/social-links').catch(() => [])
         if (design.branding?.logo) siteLogo.value = design.branding.logo
 
         const settingsRows = await api<Array<{ key: string, value: string }>>('/settings').catch(() => [])
@@ -913,12 +959,19 @@ onUnmounted(() => {
             <ThemePanel
                 v-else-if="activePanel === 'theme'"
                 :api="api"
+                @saved="onThemeSaved"
             />
 
             <MenusPanel
                 v-else-if="activePanel === 'menus'"
                 :api="api"
                 :pages="pages"
+            />
+
+            <SocialLinksPanel
+                v-else-if="activePanel === 'social'"
+                :api="api"
+                @saved="onSocialLinksSaved"
             />
 
             <FormsPanel
@@ -978,6 +1031,15 @@ onUnmounted(() => {
                 <Input v-model="pageTitle" class="h-9 min-w-0 flex-1 font-medium sm:max-w-sm" aria-label="Page title" />
                 <Badge variant="secondary" class="shrink-0">{{ selectedPage?.status ?? 'draft' }}</Badge>
                 <div class="ml-auto flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto">
+                    <Button
+                        size="sm"
+                        :variant="reorderEnabled ? 'secondary' : 'outline'"
+                        class="gap-1.5 md:hidden"
+                        @click="reorderEnabled = !reorderEnabled"
+                    >
+                        <Menu class="size-4" />
+                        <span>{{ reorderEnabled ? 'Reorder on' : 'Scroll mode' }}</span>
+                    </Button>
                     <Button size="sm" variant="outline" class="gap-1.5" @click="undo"><Undo2 class="size-4" /><span class="hidden sm:inline">Undo</span></Button>
                     <Button size="sm" variant="outline" class="gap-1.5" @click="redo"><Redo2 class="size-4" /><span class="hidden sm:inline">Redo</span></Button>
                     <Button size="sm" variant="outline" class="gap-1.5" :disabled="saving" @click="savePage()">
@@ -1100,14 +1162,15 @@ onUnmounted(() => {
                             :logo-url="siteLogo"
                             :menu-items="headerMenu"
                             :footer-items="footerMenu"
-                            :chrome="siteChrome"
+                            :chrome="previewChrome"
                             :public-url="selectedPage ? `/${selectedPage.slug}` : '/'"
                         >
                             <VueDraggable
                                 v-model="documentState.blocks"
                                 class="dc-live-blocks space-y-1 p-2 md:p-4"
                                 group="builder-blocks"
-                                :animation="180"
+                                v-bind="builderDraggableOptions"
+                                :disabled="!reorderEnabled"
                                 @end="snapshot"
                             >
                                 <BuilderBlockView

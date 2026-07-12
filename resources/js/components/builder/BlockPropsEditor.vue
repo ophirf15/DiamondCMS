@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref, type Ref } from 'vue'
 import { Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import IconPicker from '@/components/ui/IconPicker.vue'
 import SocialBrandIcon from '@/components/builder/SocialBrandIcon.vue'
 import type { BuilderBlock } from '@/components/builder/BuilderBlockView.vue'
+import { type SocialLinkRecord } from '@/lib/socialLinks'
 
 const props = defineProps<{
     block: BuilderBlock
@@ -24,6 +25,7 @@ type GalleryItem = { src: string, alt: string }
 
 const iconPickerOpen = ref(false)
 const iconPickerIndex = ref(0)
+const socialLinksLibrary = inject<Ref<SocialLinkRecord[]>>('socialLinksLibrary', ref([]))
 
 const socialVariants = [
     { key: 'list', label: 'Text list' },
@@ -50,6 +52,61 @@ const scalarKeys = computed(() =>
 )
 
 const isMultiline = (key: string): boolean => key === 'text' || key === 'html' || key === 'excerpt' || key === 'summary'
+
+const socialSource = computed({
+    get(): 'library' | 'custom' {
+        const source = props.block.props.source
+        if (source === 'custom' || source === 'library') {
+            return source
+        }
+        const items = props.block.props.items
+        return Array.isArray(items) && items.length > 0 ? 'custom' : 'library'
+    },
+    set(value: 'library' | 'custom') {
+        props.block.props.source = value
+        if (value === 'library' && props.block.props.selection === undefined) {
+            props.block.props.selection = 'all'
+        }
+        touch()
+    },
+})
+
+const socialSelectionMode = computed({
+    get(): 'all' | 'pick' {
+        const selection = props.block.props.selection
+        return selection === 'all' || selection === undefined ? 'all' : 'pick'
+    },
+    set(value: 'all' | 'pick') {
+        props.block.props.selection = value === 'all' ? 'all' : []
+        touch()
+    },
+})
+
+const selectedSocialLinkIds = computed({
+    get(): string[] {
+        const selection = props.block.props.selection
+        return Array.isArray(selection) ? selection : []
+    },
+    set(next: string[]) {
+        props.block.props.selection = next
+        touch()
+    },
+})
+
+function toggleSocialLinkId(id: string): void {
+    const ids = [...selectedSocialLinkIds.value]
+    const index = ids.indexOf(id)
+    if (index >= 0) {
+        ids.splice(index, 1)
+    } else {
+        ids.push(id)
+    }
+    selectedSocialLinkIds.value = ids
+}
+
+function isSocialLinkSelected(id: string): boolean {
+    return selectedSocialLinkIds.value.includes(id)
+}
 
 const socialVariant = computed({
     get(): string {
@@ -317,30 +374,101 @@ function removeGallery(index: number): void {
                     </button>
                 </div>
             </div>
-            <div class="flex items-center justify-between gap-2">
-                <Label>Links</Label>
-                <Button size="sm" variant="outline" class="gap-1" @click="addSocial">
-                    <Plus class="size-3.5" />
-                    Add
-                </Button>
-            </div>
-            <div v-for="(item, index) in socialItems" :key="index" class="space-y-2 rounded-lg border p-3">
-                <div class="flex items-center justify-between gap-2">
+            <div class="space-y-2">
+                <Label>Link source</Label>
+                <div class="grid grid-cols-2 gap-2">
                     <button
                         type="button"
-                        class="hover:border-primary flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition"
-                        @click="openIconPicker(index)"
+                        class="hover:border-primary rounded-lg border px-2 py-1.5 text-left text-xs transition"
+                        :class="socialSource === 'library' ? 'border-primary ring-primary/30 ring-1' : ''"
+                        @click="socialSource = 'library'"
                     >
-                        <SocialBrandIcon :slug="item.icon" :label="item.label" :url="item.url" :size="16" />
-                        {{ item.icon || 'Pick icon' }}
+                        Site library
                     </button>
-                    <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="removeSocial(index)">
-                        <Trash2 class="size-3.5" />
+                    <button
+                        type="button"
+                        class="hover:border-primary rounded-lg border px-2 py-1.5 text-left text-xs transition"
+                        :class="socialSource === 'custom' ? 'border-primary ring-primary/30 ring-1' : ''"
+                        @click="socialSource = 'custom'"
+                    >
+                        Custom only
+                    </button>
+                </div>
+                <p class="text-muted-foreground text-xs">
+                    Manage your link library under Admin → Social links.
+                </p>
+            </div>
+            <template v-if="socialSource === 'library'">
+                <div class="space-y-2">
+                    <Label>Which links</Label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            class="hover:border-primary rounded-lg border px-2 py-1.5 text-left text-xs transition"
+                            :class="socialSelectionMode === 'all' ? 'border-primary ring-primary/30 ring-1' : ''"
+                            @click="socialSelectionMode = 'all'"
+                        >
+                            All library links
+                        </button>
+                        <button
+                            type="button"
+                            class="hover:border-primary rounded-lg border px-2 py-1.5 text-left text-xs transition"
+                            :class="socialSelectionMode === 'pick' ? 'border-primary ring-primary/30 ring-1' : ''"
+                            @click="socialSelectionMode = 'pick'"
+                        >
+                            Pick specific links
+                        </button>
+                    </div>
+                </div>
+                <div v-if="socialSelectionMode === 'pick'" class="space-y-2">
+                    <p v-if="!socialLinksLibrary.length" class="text-muted-foreground text-xs">
+                        No links in the library yet. Add some under Social links first.
+                    </p>
+                    <label
+                        v-for="link in socialLinksLibrary"
+                        :key="link.id"
+                        class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                    >
+                        <input
+                            type="checkbox"
+                            class="size-4 rounded border"
+                            :checked="isSocialLinkSelected(link.id)"
+                            @change="toggleSocialLinkId(link.id)"
+                        >
+                        <SocialBrandIcon :slug="link.icon" :label="link.label" :url="link.url" :size="16" />
+                        <span class="min-w-0 truncate">{{ link.label }}</span>
+                    </label>
+                </div>
+                <p v-else-if="!socialLinksLibrary.length" class="text-muted-foreground text-xs">
+                    Add links in Social links to populate this block.
+                </p>
+            </template>
+            <template v-else>
+                <div class="flex items-center justify-between gap-2">
+                    <Label>Custom links</Label>
+                    <Button size="sm" variant="outline" class="gap-1" @click="addSocial">
+                        <Plus class="size-3.5" />
+                        Add
                     </Button>
                 </div>
-                <Input :model-value="item.label" placeholder="Label" @update:model-value="updateSocial(index, 'label', String($event))" />
-                <Input :model-value="item.url" placeholder="https://" @update:model-value="updateSocial(index, 'url', String($event))" />
-            </div>
+                <div v-for="(item, index) in socialItems" :key="index" class="space-y-2 rounded-lg border p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <button
+                            type="button"
+                            class="hover:border-primary flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition"
+                            @click="openIconPicker(index)"
+                        >
+                            <SocialBrandIcon :slug="item.icon" :label="item.label" :url="item.url" :size="16" />
+                            {{ item.icon || 'Pick icon' }}
+                        </button>
+                        <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="removeSocial(index)">
+                            <Trash2 class="size-3.5" />
+                        </Button>
+                    </div>
+                    <Input :model-value="item.label" placeholder="Label" @update:model-value="updateSocial(index, 'label', String($event))" />
+                    <Input :model-value="item.url" placeholder="https://" @update:model-value="updateSocial(index, 'url', String($event))" />
+                </div>
+            </template>
             <IconPicker
                 v-model:open="iconPickerOpen"
                 :model-value="socialItems[iconPickerIndex]?.icon || null"

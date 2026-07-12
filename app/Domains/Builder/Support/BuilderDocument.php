@@ -6,6 +6,7 @@ namespace App\Domains\Builder\Support;
 
 use App\Domains\Design\Support\DesignManager;
 use App\Domains\Design\Support\SocialIcons;
+use App\Domains\Design\Support\SocialLinksManager;
 use App\Domains\Forms\Support\FormManager;
 use App\Domains\Portfolio\Support\PortfolioManager;
 use App\Domains\Resume\Support\ResumeManager;
@@ -108,11 +109,9 @@ final class BuilderDocument
             ]],
             ['type' => 'social-links', 'label' => 'Social links', 'defaults' => [
                 'variant' => 'icons-labels',
-                'items' => [
-                    ['label' => 'Email', 'url' => 'mailto:hello@example.com', 'icon' => 'email'],
-                    ['label' => 'LinkedIn', 'url' => 'https://linkedin.com', 'icon' => 'linkedin'],
-                    ['label' => 'Instagram', 'url' => 'https://instagram.com', 'icon' => 'instagram'],
-                ],
+                'source' => 'library',
+                'selection' => 'all',
+                'items' => [],
             ]],
             ['type' => 'timeline', 'label' => 'Timeline', 'defaults' => [
                 'items' => [
@@ -213,17 +212,14 @@ final class BuilderDocument
     /** @param array<string, mixed> $props */
     private static function socialLinks(array $props): string
     {
-        $items = Arr::get($props, 'items', []);
-        if (! is_array($items)) {
-            $items = [];
-        }
+        $items = SocialLinksManager::resolveBlockProps($props);
 
         $variant = (string) Arr::get($props, 'variant', DesignManager::socialStyle());
         if (! array_key_exists($variant, DesignManager::socialStyles())) {
             $variant = 'icons-labels';
         }
 
-        return SocialIcons::groupHtml(array_values($items), $variant);
+        return SocialIcons::groupHtml($items, $variant);
     }
 
     /** @param array<string, mixed> $props */

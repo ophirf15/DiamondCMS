@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, provide, ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import {
     ArrowLeft,
     ExternalLink,
+    GripVertical,
     LayoutTemplate,
     PanelLeft,
     Save,
@@ -21,6 +22,8 @@ import { toast } from 'vue-sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { uploadMediaFile } from '@/lib/mediaUpload'
 import { initThemeToggle } from '@/public'
+import { builderDraggableOptions } from '@/lib/builderDraggable'
+import { type SocialLinkRecord } from '@/lib/socialLinks'
 
 type BuilderDocument = {
     schema: number
@@ -52,6 +55,7 @@ type Boot = {
     themeDefault?: string
     themeLock?: boolean
     shell?: string
+    socialLinksLibrary?: SocialLinkRecord[]
 }
 
 const root = document.getElementById('live-editor-app')
@@ -66,6 +70,11 @@ const mediaFiles = ref<MediaItem[]>([])
 const showMediaPicker = ref(false)
 const mediaPickerTarget = ref<{ field: 'src' } | { field: 'images', index: number } | null>(null)
 const uploadingImage = ref(false)
+const reorderEnabled = ref(typeof window !== 'undefined' ? window.matchMedia('(min-width: 801px)').matches : true)
+const socialLinksLibrary = ref<SocialLinkRecord[]>(boot.socialLinksLibrary ?? [])
+
+provide('socialLinksLibrary', socialLinksLibrary)
+provide('builderReorderEnabled', reorderEnabled)
 
 const shell = computed(() => documentState.value.meta?.shell || boot.shell || 'default')
 const siteName = boot.siteName || 'DiamondCMS'
@@ -311,6 +320,15 @@ onMounted(() => {
                 </div>
             </div>
             <div class="dc-live-toolbar-right">
+                <Button
+                    size="sm"
+                    :variant="reorderEnabled ? 'secondary' : 'outline'"
+                    class="gap-1.5 md:hidden"
+                    @click="reorderEnabled = !reorderEnabled"
+                >
+                    <GripVertical class="size-4" />
+                    {{ reorderEnabled ? 'Reorder on' : 'Scroll mode' }}
+                </Button>
                 <Button size="sm" variant="secondary" class="gap-1.5" :disabled="saving" @click="save()">
                     <Save class="size-4" />
                     Save draft
@@ -381,7 +399,8 @@ onMounted(() => {
                         v-model="documentState.blocks"
                         class="dc-live-blocks"
                         group="builder-blocks"
-                        :animation="180"
+                        v-bind="builderDraggableOptions"
+                        :disabled="!reorderEnabled"
                         @end="onUpdate"
                     >
                         <BuilderBlockView

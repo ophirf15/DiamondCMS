@@ -60,6 +60,7 @@ final class DesignManager
                 'footerCreditText' => 'Powered by DiamondCMS',
                 'footerCreditUrl' => '',
                 'footerSocials' => [],
+                'footerSocialLinkIds' => [],
                 'footerSocialStyle' => 'icons',
             ],
             'buttons' => [
@@ -554,7 +555,26 @@ final class DesignManager
     /** @return array<string, mixed> */
     public static function chrome(): array
     {
-        return self::tokens()['chrome'] ?? [];
+        $chrome = self::tokens()['chrome'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['chrome'], is_array($chrome) ? $chrome : []);
+    }
+
+    /** @return array<int, array{label: string, url: string, icon: string}> */
+    public static function footerSocialItems(): array
+    {
+        $chrome = self::chrome();
+        $ids = $chrome['footerSocialLinkIds'] ?? null;
+        if (is_array($ids) && $ids !== []) {
+            $resolved = SocialLinksManager::resolve($ids);
+            if ($resolved !== []) {
+                return $resolved;
+            }
+        }
+
+        $legacy = $chrome['footerSocials'] ?? [];
+
+        return is_array($legacy) ? array_values($legacy) : [];
     }
 
     /** @return array<string, mixed> */

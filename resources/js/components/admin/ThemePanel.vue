@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import IconPicker from '@/components/ui/IconPicker.vue'
 import SocialBrandIcon from '@/components/builder/SocialBrandIcon.vue'
 import { showActionToast } from '@/lib/actionToast'
+import { resolveFooterSocialLinks, type SocialLinkRecord } from '@/lib/socialLinks'
 
 type SocialLinkItem = { label: string, url: string, icon: string }
 
@@ -30,6 +29,7 @@ type DesignTokens = {
         footerCreditText?: string
         footerCreditUrl?: string
         footerSocials?: SocialLinkItem[]
+        footerSocialLinkIds?: string[]
         footerSocialStyle?: string
     }
     buttons?: { style: string }
@@ -83,6 +83,12 @@ type PortfolioPreviewMode = 'detail' | 'index'
 const props = defineProps<{
     api: <T>(url: string, options?: RequestInit) => Promise<T>
 }>()
+
+const emit = defineEmits<{
+    saved: [tokens: DesignTokens]
+}>()
+
+const socialLibrary = ref<SocialLinkRecord[]>([])
 
 const tokens = ref<DesignTokens | null>(null)
 const saving = ref(false)
@@ -267,8 +273,6 @@ const sampleProjects = [
     { title: 'Northwind Studio', thumb: 'linear-gradient(135deg, #062828, #b8ff3c)' },
 ]
 
-const footerSocialIconOpen = ref(false)
-const footerSocialIconIndex = ref(0)
 
 const navyDark = {
     background: '#050a15',
@@ -313,6 +317,7 @@ function ensureChrome(tokensValue: DesignTokens): void {
             footerCreditText: 'Powered by DiamondCMS',
             footerCreditUrl: '',
             footerSocials: [],
+            footerSocialLinkIds: [],
             footerSocialStyle: 'icons',
         }
     } else {
@@ -321,6 +326,7 @@ function ensureChrome(tokensValue: DesignTokens): void {
         tokensValue.chrome.footerCreditText ??= 'Powered by DiamondCMS'
         tokensValue.chrome.footerCreditUrl ??= ''
         tokensValue.chrome.footerSocials ??= []
+        tokensValue.chrome.footerSocialLinkIds ??= []
         tokensValue.chrome.footerSocialStyle ??= 'icons'
     }
     if (!tokensValue.buttons) {
@@ -393,35 +399,35 @@ function ensureChrome(tokensValue: DesignTokens): void {
     }
 }
 
-const footerSocials = computed({
-    get(): SocialLinkItem[] {
-        return tokens.value?.chrome?.footerSocials ?? []
+const footerSocialLinkIds = computed({
+    get(): string[] {
+        return tokens.value?.chrome?.footerSocialLinkIds ?? []
     },
-    set(next: SocialLinkItem[]) {
+    set(next: string[]) {
         if (!tokens.value?.chrome) return
-        tokens.value.chrome.footerSocials = next
+        tokens.value.chrome.footerSocialLinkIds = next
     },
 })
 
-function addFooterSocial(): void {
-    footerSocials.value = [...footerSocials.value, { label: 'Instagram', url: 'https://instagram.com', icon: 'instagram' }]
+const footerSocialPreview = computed(() => resolveFooterSocialLinks(
+    socialLibrary.value,
+    footerSocialLinkIds.value,
+    tokens.value?.chrome?.footerSocials,
+))
+
+function toggleFooterSocialLink(id: string): void {
+    const ids = [...footerSocialLinkIds.value]
+    const index = ids.indexOf(id)
+    if (index >= 0) {
+        ids.splice(index, 1)
+    } else {
+        ids.push(id)
+    }
+    footerSocialLinkIds.value = ids
 }
 
-function removeFooterSocial(index: number): void {
-    footerSocials.value = footerSocials.value.filter((_, i) => i !== index)
-}
-
-function updateFooterSocial(index: number, key: keyof SocialLinkItem, value: string): void {
-    footerSocials.value = footerSocials.value.map((row, i) => (i === index ? { ...row, [key]: value } : row))
-}
-
-function openFooterIconPicker(index: number): void {
-    footerSocialIconIndex.value = index
-    footerSocialIconOpen.value = true
-}
-
-function onFooterIconPicked(slug: string): void {
-    updateFooterSocial(footerSocialIconIndex.value, 'icon', slug)
+function isFooterSocialLinkSelected(id: string): boolean {
+    return footerSocialLinkIds.value.includes(id)
 }
 
 const previewRadius = computed(() => {
@@ -509,9 +515,13 @@ const resumeMockStyle = computed(() => {
 
 async function load(): Promise<void> {
     try {
-        const loaded = await props.api<DesignTokens>('/design')
+        const [loaded, library] = await Promise.all([
+            props.api<DesignTokens>('/design'),
+            props.api<SocialLinkRecord[]>('/social-links').catch(() => []),
+        ])
         ensureChrome(loaded)
         tokens.value = loaded
+        socialLibrary.value = library
     } catch (error) {
         showActionToast(null, error instanceof Error ? error.message : 'Could not load theme', 'error')
     }
@@ -527,6 +537,7 @@ async function save(event?: Event): Promise<void> {
         })
         ensureChrome(saved)
         tokens.value = saved
+        emit('saved', saved)
         showActionToast(event, 'Theme saved — public site updated')
     } catch (error) {
         showActionToast(event, error instanceof Error ? error.message : 'Could not save theme', 'error')
@@ -769,15 +780,11 @@ onMounted(load)
                                     </div>
                                 </div>
                                 <div class="space-y-3 rounded-lg border p-3">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <div>
-                                            <p class="text-sm font-medium">Footer social links</p>
-                                            <p class="text-muted-foreground text-xs">LinkedIn, Instagram, and more — shown site-wide in the footer.</p>
-                                        </div>
-                                        <Button size="sm" variant="outline" class="gap-1" @click="addFooterSocial">
-                                            <Plus class="size-3.5" />
-                                            Add
-                                        </Button>
+                                    <div>
+                                        <p class="text-sm font-medium">Footer social links</p>
+                                        <p class="text-muted-foreground text-xs">
+                                            Choose from your site library (Admin → Social links). Order follows your selection.
+                                        </p>
                                     </div>
                                     <div class="grid gap-2 sm:grid-cols-2">
                                         <button
@@ -792,23 +799,23 @@ onMounted(load)
                                             <div class="text-muted-foreground">{{ style.description }}</div>
                                         </button>
                                     </div>
-                                    <div v-for="(item, index) in footerSocials" :key="index" class="space-y-2 rounded-lg border p-3">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <button
-                                                type="button"
-                                                class="hover:border-primary flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition"
-                                                @click="openFooterIconPicker(index)"
-                                            >
-                                                <SocialBrandIcon :slug="item.icon" :label="item.label" :url="item.url" :size="16" />
-                                                {{ item.icon || 'Pick icon' }}
-                                            </button>
-                                            <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="removeFooterSocial(index)">
-                                                <Trash2 class="size-3.5" />
-                                            </Button>
-                                        </div>
-                                        <Input :model-value="item.label" placeholder="Label" @update:model-value="updateFooterSocial(index, 'label', String($event))" />
-                                        <Input :model-value="item.url" placeholder="https://" @update:model-value="updateFooterSocial(index, 'url', String($event))" />
-                                    </div>
+                                    <p v-if="!socialLibrary.length" class="text-muted-foreground text-xs">
+                                        No links yet. Add LinkedIn, Instagram, and more under Social links first.
+                                    </p>
+                                    <label
+                                        v-for="link in socialLibrary"
+                                        :key="link.id"
+                                        class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="size-4 rounded border"
+                                            :checked="isFooterSocialLinkSelected(link.id)"
+                                            @change="toggleFooterSocialLink(link.id)"
+                                        >
+                                        <SocialBrandIcon :slug="link.icon" :label="link.label" :url="link.url" :size="16" />
+                                        <span class="min-w-0 truncate">{{ link.label }}</span>
+                                    </label>
                                 </div>
                             </CardContent>
                         </Card>
@@ -1461,9 +1468,9 @@ onMounted(load)
                                     <span>Contact</span>
                                 </div>
                                 <p v-if="tokens.chrome?.footerTagline" class="mt-1 opacity-60">{{ tokens.chrome.footerTagline }}</p>
-                                <div v-if="footerSocials.length" class="mt-2 flex flex-wrap gap-2" :class="tokens.chrome?.footerStyle === 'centered' ? 'justify-center' : ''">
+                                <div v-if="footerSocialPreview.length" class="mt-2 flex flex-wrap gap-2" :class="tokens.chrome?.footerStyle === 'centered' ? 'justify-center' : ''">
                                     <span
-                                        v-for="(item, index) in footerSocials"
+                                        v-for="(item, index) in footerSocialPreview"
                                         :key="index"
                                         class="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px]"
                                     >
@@ -1719,12 +1726,6 @@ onMounted(load)
             </Card>
         </div>
 
-        <IconPicker
-            v-model:open="footerSocialIconOpen"
-            :model-value="footerSocials[footerSocialIconIndex]?.icon || null"
-            title="Footer social icon"
-            @update:model-value="onFooterIconPicked"
-        />
     </section>
 </template>
 

@@ -10,10 +10,7 @@
         $creditText = 'Powered by DiamondCMS';
     }
     $creditUrl = trim((string) ($chrome['footerCreditUrl'] ?? ''));
-    $footerSocials = $chrome['footerSocials'] ?? [];
-    if (! is_array($footerSocials)) {
-        $footerSocials = [];
-    }
+    $footerSocials = \App\Domains\Design\Support\DesignManager::footerSocialItems();
     $footerSocialStyle = (string) ($chrome['footerSocialStyle'] ?? \App\Domains\Design\Support\DesignManager::socialStyle());
     if (! array_key_exists($footerSocialStyle, \App\Domains\Design\Support\DesignManager::socialStyles())) {
         $footerSocialStyle = 'icons';

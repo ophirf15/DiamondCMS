@@ -747,6 +747,7 @@ body.dc-btn-underline .dc-button:hover,
 .dc-live-stack {
     display: block;
     min-width: 0;
+    touch-action: pan-y;
 }
 
 .dc-section--nested {
@@ -2579,7 +2580,17 @@ html[data-dc-surface="soft"] .dc-project-cta.dc-button {
 
 .dc-live-blocks {
     min-height: 40vh;
+    touch-action: pan-y;
     width: 100%;
+}
+
+.dc-drag-handle {
+    cursor: grab;
+    touch-action: none;
+}
+
+.dc-drag-handle:active {
+    cursor: grabbing;
 }
 
 .dc-live-stage .dc-header {

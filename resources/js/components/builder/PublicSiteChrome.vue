@@ -18,6 +18,7 @@ export type ChromeConfig = {
     footerCreditText?: string
     footerCreditUrl?: string
     footerSocials?: SocialLinkItem[]
+    footerSocialLinkIds?: string[]
     footerSocialStyle?: string
 }
 
