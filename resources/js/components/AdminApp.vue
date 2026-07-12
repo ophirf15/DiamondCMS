@@ -879,6 +879,7 @@ onMounted(load)
             <PortfolioPanel
                 v-else-if="activePanel === 'portfolio'"
                 :api="api"
+                :csrf="csrf"
             />
 
             <SeoPanel

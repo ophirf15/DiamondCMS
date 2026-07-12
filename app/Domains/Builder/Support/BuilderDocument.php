@@ -355,15 +355,11 @@ final class BuilderDocument
     /** @param array<string, mixed> $props */
     private static function featuredProjects(array $props): string
     {
-        $projects = app(PortfolioManager::class)->featuredForBuilder((int) Arr::get($props, 'limit', 6));
-        $cards = $projects->map(fn (object $project) => sprintf(
-            '<article class="dc-project-card"><h3><a href="%s">%s</a></h3><p>%s</p></article>',
-            e(route('projects.show', $project->slug)),
-            e($project->title),
-            e((string) $project->summary),
-        ))->implode('');
+        $portfolio = app(PortfolioManager::class);
+        $projects = $portfolio->featuredForBuilder((int) Arr::get($props, 'limit', 6));
+        $cards = $projects->map(fn (object $project) => $portfolio->projectCardHtml($project))->implode('');
 
-        return '<div class="dc-project-grid">'.$cards.'</div>';
+        return '<div class="dc-project-grid" data-dc-animate="stagger">'.$cards.'</div>';
     }
 
     private static function projectCard(string $slug): string
@@ -373,17 +369,13 @@ final class BuilderDocument
         }
 
         try {
-            $project = app(PortfolioManager::class)->publicProject($slug);
+            $portfolio = app(PortfolioManager::class);
+            $project = $portfolio->publicProject($slug);
         } catch (\Throwable) {
             return '';
         }
 
-        return sprintf(
-            '<article class="dc-project-card"><h3><a href="%s">%s</a></h3><p>%s</p></article>',
-            e(route('projects.show', $project->slug)),
-            e($project->title),
-            e((string) $project->summary),
-        );
+        return $portfolio->projectCardHtml($project);
     }
 
     /** @param array<string, string> $styles */

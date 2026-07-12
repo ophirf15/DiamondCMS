@@ -1,5 +1,4 @@
-import * as simpleIcons from 'simple-icons'
-
+/** Local fallbacks for brands missing from Simple Icons (trademark removals) + generics. */
 export type BrandIcon = {
     slug: string
     title: string
@@ -8,8 +7,7 @@ export type BrandIcon = {
     source: 'simple-icons' | 'local'
 }
 
-/** Brands removed from Simple Icons (trademark) or not brand marks — local SVG paths. */
-const LOCAL_FALLBACKS: BrandIcon[] = [
+export const LOCAL_FALLBACKS: BrandIcon[] = [
     {
         slug: 'linkedin',
         title: 'LinkedIn',
@@ -64,81 +62,50 @@ export const POPULAR_SOCIAL_SLUGS = [
     'website',
 ] as const
 
-type SimpleIconLike = {
-    title: string
-    slug: string
-    hex: string
-    path: string
-}
+/** Lightweight popular meta for picker chrome without loading the full simple-icons package. */
+export const POPULAR_META: Array<{ slug: string, title: string, hex: string }> = [
+    { slug: 'linkedin', title: 'LinkedIn', hex: '0A66C2' },
+    { slug: 'instagram', title: 'Instagram', hex: 'E4405F' },
+    { slug: 'github', title: 'GitHub', hex: '181717' },
+    { slug: 'x', title: 'X', hex: '000000' },
+    { slug: 'youtube', title: 'YouTube', hex: 'FF0000' },
+    { slug: 'facebook', title: 'Facebook', hex: '0866FF' },
+    { slug: 'tiktok', title: 'TikTok', hex: '000000' },
+    { slug: 'threads', title: 'Threads', hex: '000000' },
+    { slug: 'bluesky', title: 'Bluesky', hex: '0285FF' },
+    { slug: 'discord', title: 'Discord', hex: '5865F2' },
+    { slug: 'telegram', title: 'Telegram', hex: '26A5E4' },
+    { slug: 'whatsapp', title: 'WhatsApp', hex: '25D366' },
+    { slug: 'spotify', title: 'Spotify', hex: '1DB954' },
+    { slug: 'medium', title: 'Medium', hex: '000000' },
+    { slug: 'behance', title: 'Behance', hex: '1769FF' },
+    { slug: 'dribbble', title: 'Dribbble', hex: 'EA4C89' },
+    { slug: 'mastodon', title: 'Mastodon', hex: '6364FF' },
+    { slug: 'gmail', title: 'Gmail', hex: 'EA4335' },
+    { slug: 'email', title: 'Email', hex: 'EA4335' },
+    { slug: 'phone', title: 'Phone', hex: '34A853' },
+    { slug: 'website', title: 'Website', hex: '6366F1' },
+]
 
-function isSimpleIcon(value: unknown): value is SimpleIconLike {
-    if (!value || typeof value !== 'object') return false
-    const row = value as Record<string, unknown>
-    return typeof row.slug === 'string' && typeof row.title === 'string' && typeof row.path === 'string' && typeof row.hex === 'string'
-}
+const localBySlug = new Map(LOCAL_FALLBACKS.map((icon) => [icon.slug, icon]))
 
-let cachedCatalog: BrandIcon[] | null = null
-let cachedBySlug: Map<string, BrandIcon> | null = null
-
-export function brandIconCatalog(): BrandIcon[] {
-    if (cachedCatalog) return cachedCatalog
-
-    const fromPackage = Object.values(simpleIcons)
-        .filter(isSimpleIcon)
-        .map((icon): BrandIcon => ({
-            slug: icon.slug,
-            title: icon.title,
-            hex: icon.hex,
-            path: icon.path,
-            source: 'simple-icons',
-        }))
-
-    const localOnly = LOCAL_FALLBACKS.filter((local) => !fromPackage.some((icon) => icon.slug === local.slug))
-    cachedCatalog = [...localOnly, ...fromPackage].sort((a, b) => a.title.localeCompare(b.title))
-    cachedBySlug = new Map(cachedCatalog.map((icon) => [icon.slug, icon]))
-    return cachedCatalog
-}
-
-export function getBrandIcon(slug: string | null | undefined): BrandIcon | null {
+export function getLocalIcon(slug: string | null | undefined): BrandIcon | null {
     if (!slug) return null
-    if (!cachedBySlug) brandIconCatalog()
-    return cachedBySlug?.get(slug) ?? null
+    return localBySlug.get(slug) ?? null
 }
 
-export function popularBrandIcons(): BrandIcon[] {
-    return POPULAR_SOCIAL_SLUGS
-        .map((slug) => getBrandIcon(slug))
-        .filter((icon): icon is BrandIcon => !!icon)
-}
-
-export function searchBrandIcons(query: string, limit = 80): BrandIcon[] {
-    const q = query.trim().toLowerCase()
-    const catalog = brandIconCatalog()
-    if (!q) return popularBrandIcons()
-    const scored = catalog
-        .map((icon) => {
-            const title = icon.title.toLowerCase()
-            const slug = icon.slug.toLowerCase()
-            let score = 0
-            if (slug === q || title === q) score = 100
-            else if (slug.startsWith(q) || title.startsWith(q)) score = 80
-            else if (slug.includes(q) || title.includes(q)) score = 40
-            return { icon, score }
-        })
-        .filter((row) => row.score > 0)
-        .sort((a, b) => b.score - a.score || a.icon.title.localeCompare(b.icon.title))
-        .slice(0, limit)
-    return scored.map((row) => row.icon)
-}
-
-export function iconSvgMarkup(icon: BrandIcon, colored = true): string {
-    const fill = colored ? `#${icon.hex}` : 'currentColor'
-    return `<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><title>${escapeXml(icon.title)}</title><path fill="${fill}" d="${icon.path}"/></svg>`
+export function isLocalIconSlug(slug: string): boolean {
+    return localBySlug.has(slug)
 }
 
 export function cdnIconUrl(slug: string, hex?: string): string {
     const base = `https://cdn.simpleicons.org/${encodeURIComponent(slug)}`
     return hex ? `${base}/${encodeURIComponent(hex)}` : base
+}
+
+export function iconSvgMarkup(icon: BrandIcon, colored = true): string {
+    const fill = colored ? `#${icon.hex}` : 'currentColor'
+    return `<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><title>${escapeXml(icon.title)}</title><path fill="${fill}" d="${icon.path}"/></svg>`
 }
 
 export function guessIconSlug(label: string, url: string): string {
@@ -147,7 +114,7 @@ export function guessIconSlug(label: string, url: string): string {
         [/linkedin/, 'linkedin'],
         [/instagram|\binsta\b/, 'instagram'],
         [/github/, 'github'],
-        [/\bx\.com\b|\btwitter\b|\bx\b/, 'x'],
+        [/\bx\.com\b|\btwitter\b/, 'x'],
         [/youtube|youtu\.be/, 'youtube'],
         [/facebook|fb\.com/, 'facebook'],
         [/tiktok/, 'tiktok'],
@@ -161,12 +128,13 @@ export function guessIconSlug(label: string, url: string): string {
         [/behance/, 'behance'],
         [/dribbble/, 'dribbble'],
         [/mastodon/, 'mastodon'],
-        [/mailto:|@|email|gmail/, 'email'],
+        [/mailto:|email|gmail/, 'email'],
         [/^tel:|phone|call/, 'phone'],
     ]
     for (const [re, slug] of rules) {
         if (re.test(hay)) return slug
     }
+    if (/(^|[^a-z])x([^a-z]|$)/.test(hay)) return 'x'
     return 'website'
 }
 
@@ -178,4 +146,88 @@ function escapeXml(value: string): string {
         '"': '&quot;',
         "'": '&apos;',
     }[ch] || ch))
+}
+
+type SimpleIconLike = {
+    title: string
+    slug: string
+    hex: string
+    path: string
+}
+
+function isSimpleIcon(value: unknown): value is SimpleIconLike {
+    if (!value || typeof value !== 'object') return false
+    const row = value as Record<string, unknown>
+    return typeof row.slug === 'string' && typeof row.title === 'string' && typeof row.path === 'string' && typeof row.hex === 'string'
+}
+
+let catalogPromise: Promise<BrandIcon[]> | null = null
+let cachedCatalog: BrandIcon[] | null = null
+let cachedBySlug: Map<string, BrandIcon> | null = null
+
+/** Lazy-load the full Simple Icons catalog (picker only). */
+export async function loadBrandIconCatalog(): Promise<BrandIcon[]> {
+    if (cachedCatalog) return cachedCatalog
+    if (!catalogPromise) {
+        catalogPromise = import('simple-icons').then((mod) => {
+            const fromPackage = Object.values(mod)
+                .filter(isSimpleIcon)
+                .map((icon): BrandIcon => ({
+                    slug: icon.slug,
+                    title: icon.title,
+                    hex: icon.hex,
+                    path: icon.path,
+                    source: 'simple-icons',
+                }))
+            const localOnly = LOCAL_FALLBACKS.filter((local) => !fromPackage.some((icon) => icon.slug === local.slug))
+            cachedCatalog = [...localOnly, ...fromPackage].sort((a, b) => a.title.localeCompare(b.title))
+            cachedBySlug = new Map(cachedCatalog.map((icon) => [icon.slug, icon]))
+            return cachedCatalog
+        })
+    }
+    return catalogPromise
+}
+
+export function getBrandIconSync(slug: string | null | undefined): BrandIcon | null {
+    if (!slug) return null
+    return getLocalIcon(slug) ?? cachedBySlug?.get(slug) ?? null
+}
+
+export async function getBrandIcon(slug: string | null | undefined): Promise<BrandIcon | null> {
+    if (!slug) return null
+    const local = getLocalIcon(slug)
+    if (local) return local
+    await loadBrandIconCatalog()
+    return cachedBySlug?.get(slug) ?? null
+}
+
+export function searchBrandIconsSync(query: string, catalog: BrandIcon[], limit = 80): BrandIcon[] {
+    const q = query.trim().toLowerCase()
+    if (!q) {
+        return POPULAR_META.map((meta) => {
+            const local = getLocalIcon(meta.slug)
+            if (local) return local
+            return catalog.find((icon) => icon.slug === meta.slug) || {
+                slug: meta.slug,
+                title: meta.title,
+                hex: meta.hex,
+                path: '',
+                source: 'simple-icons' as const,
+            }
+        }).filter((icon) => icon.path || !isLocalIconSlug(icon.slug))
+    }
+    return catalog
+        .map((icon) => {
+            const title = icon.title.toLowerCase()
+            const slug = icon.slug.toLowerCase()
+            let score = 0
+            if (slug === q || title === q) score = 100
+            else if (slug.startsWith(q) || title.startsWith(q)) score = 80
+            else if (slug.includes(q) || title.includes(q)) score = 40
+            return { icon, score }
+        })
+        .filter((row) => row.score > 0)
+        .sort((a, b) => b.score - a.score || a.icon.title.localeCompare(b.icon.title))
+        .slice(0, limit)
+        .map((row) => row.icon)
 }

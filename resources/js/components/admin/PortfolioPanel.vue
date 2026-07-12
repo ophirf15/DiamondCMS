@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ExternalLink, Plus, Trash2 } from '@lucide/vue'
+import { ExternalLink, ImageIcon, Plus, Trash2, X } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +15,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import MediaPanel, { type MediaItem } from '@/components/admin/MediaPanel.vue'
 import { toast } from 'vue-sonner'
 
 type Category = { id: number, name: string, slug: string }
@@ -29,18 +30,23 @@ type Project = {
     summary?: string | null
     case_study?: string | null
     url?: string | null
+    cover_image?: string | null
     category_id?: number | null
     skills?: string | string[]
 }
 
 const props = defineProps<{
     api: <T>(url: string, options?: RequestInit) => Promise<T>
+    csrf: string
 }>()
 
 const projects = ref<Project[]>([])
 const categories = ref<Category[]>([])
 const editing = ref<Project | null>(null)
 const newCategory = ref('')
+const mediaFiles = ref<MediaItem[]>([])
+const showMediaPicker = ref(false)
+const mediaTarget = ref<'create' | 'edit'>('create')
 const form = ref({
     title: '',
     summary: '',
@@ -49,6 +55,7 @@ const form = ref({
     visibility: 'public',
     is_featured: true,
     url: '',
+    cover_image: '',
     skills: '',
     category_id: null as number | null,
 })
@@ -66,9 +73,42 @@ function skillsText(project: Project): string {
     return ''
 }
 
+function mediaUrl(item: MediaItem): string {
+    const raw = item.url || `/storage/${item.path}`
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        try {
+            return new URL(raw).pathname
+        } catch {
+            return raw
+        }
+    }
+    return raw.startsWith('/') ? raw : `/${raw}`
+}
+
 async function load(): Promise<void> {
     projects.value = await props.api<Project[]>('/portfolio/projects')
     categories.value = await props.api<Category[]>('/portfolio/categories')
+}
+
+async function loadMedia(): Promise<void> {
+    const result = await props.api<{ data: MediaItem[] }>('/media')
+    mediaFiles.value = result.data
+}
+
+async function openCoverPicker(target: 'create' | 'edit'): Promise<void> {
+    mediaTarget.value = target
+    showMediaPicker.value = true
+    if (!mediaFiles.value.length) await loadMedia()
+}
+
+function pickCover(item: MediaItem): void {
+    const url = mediaUrl(item)
+    if (mediaTarget.value === 'edit' && editing.value) {
+        editing.value.cover_image = url
+    } else {
+        form.value.cover_image = url
+    }
+    showMediaPicker.value = false
 }
 
 async function createCategory(): Promise<void> {
@@ -95,11 +135,23 @@ async function create(): Promise<void> {
                 visibility: form.value.visibility,
                 is_featured: form.value.is_featured,
                 url: form.value.url || null,
+                cover_image: form.value.cover_image || null,
                 category_id: form.value.category_id,
                 skills: form.value.skills.split(',').map((s) => s.trim()).filter(Boolean),
             }),
         })
-        form.value = { title: '', summary: '', case_study: '', status: 'published', visibility: 'public', is_featured: true, url: '', skills: '', category_id: null }
+        form.value = {
+            title: '',
+            summary: '',
+            case_study: '',
+            status: 'published',
+            visibility: 'public',
+            is_featured: true,
+            url: '',
+            cover_image: '',
+            skills: '',
+            category_id: null,
+        }
         await load()
         toast.success('Project created')
     } catch (error) {
@@ -111,6 +163,7 @@ function startEdit(project: Project): void {
     editing.value = {
         ...project,
         skills: skillsText(project),
+        cover_image: project.cover_image || '',
     }
 }
 
@@ -127,6 +180,7 @@ async function saveEdit(): Promise<void> {
                 summary: editing.value.summary,
                 case_study: editing.value.case_study,
                 url: editing.value.url || null,
+                cover_image: editing.value.cover_image || null,
                 category_id: editing.value.category_id,
                 status: editing.value.status,
                 visibility: editing.value.visibility,
@@ -173,7 +227,7 @@ onMounted(load)
     <section class="space-y-4">
         <div>
             <h1 class="text-3xl font-semibold tracking-tight">Portfolio</h1>
-            <p class="text-muted-foreground text-sm">Projects on /projects and featured grid blocks.</p>
+            <p class="text-muted-foreground text-sm">Projects on /projects and featured “Selected work” grids. Add a cover image for thumbnails.</p>
         </div>
 
         <Card class="max-w-2xl">
@@ -200,6 +254,19 @@ onMounted(load)
                 <div class="space-y-2"><Label>Title</Label><Input v-model="form.title" /></div>
                 <div class="space-y-2"><Label>Summary</Label><Textarea v-model="form.summary" rows="2" /></div>
                 <div class="space-y-2"><Label>Case study</Label><Textarea v-model="form.case_study" rows="3" /></div>
+                <div class="space-y-2">
+                    <Label>Cover / thumbnail</Label>
+                    <div v-if="form.cover_image" class="overflow-hidden rounded-lg border">
+                        <img :src="form.cover_image" alt="" class="h-36 w-full object-cover">
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <Input v-model="form.cover_image" placeholder="/storage/… or https://" class="min-w-[12rem] flex-1" />
+                        <Button type="button" variant="outline" class="gap-1" @click="openCoverPicker('create')">
+                            <ImageIcon class="size-3.5" />
+                            Library
+                        </Button>
+                    </div>
+                </div>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-2"><Label>URL</Label><Input v-model="form.url" placeholder="https://" /></div>
                     <div class="space-y-2"><Label>Skills (comma-separated)</Label><Input v-model="form.skills" placeholder="Laravel, Vue" /></div>
@@ -230,6 +297,19 @@ onMounted(load)
                 <div class="space-y-2"><Label>Title</Label><Input v-model="editing.title" /></div>
                 <div class="space-y-2"><Label>Summary</Label><Textarea v-model="editing.summary" rows="2" /></div>
                 <div class="space-y-2"><Label>Case study</Label><Textarea v-model="editing.case_study" rows="4" /></div>
+                <div class="space-y-2">
+                    <Label>Cover / thumbnail</Label>
+                    <div v-if="editing.cover_image" class="overflow-hidden rounded-lg border">
+                        <img :src="editing.cover_image" alt="" class="h-36 w-full object-cover">
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <Input v-model="editing.cover_image" placeholder="/storage/… or https://" class="min-w-[12rem] flex-1" />
+                        <Button type="button" variant="outline" class="gap-1" @click="openCoverPicker('edit')">
+                            <ImageIcon class="size-3.5" />
+                            Library
+                        </Button>
+                    </div>
+                </div>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-2"><Label>URL</Label><Input v-model="editing.url" /></div>
                     <div class="space-y-2">
@@ -261,6 +341,7 @@ onMounted(load)
             <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead class="w-16" />
                         <TableHead>Title</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Featured</TableHead>
@@ -269,9 +350,19 @@ onMounted(load)
                 </TableHeader>
                 <TableBody>
                     <TableRow v-if="projects.length === 0">
-                        <TableCell colspan="4" class="text-muted-foreground py-8 text-center">No projects yet.</TableCell>
+                        <TableCell colspan="5" class="text-muted-foreground py-8 text-center">No projects yet.</TableCell>
                     </TableRow>
                     <TableRow v-for="project in projects" :key="project.id">
+                        <TableCell>
+                            <div class="bg-muted size-12 overflow-hidden rounded-md border">
+                                <img
+                                    v-if="project.cover_image"
+                                    :src="project.cover_image"
+                                    alt=""
+                                    class="size-full object-cover"
+                                >
+                            </div>
+                        </TableCell>
                         <TableCell>
                             <p class="font-medium">{{ project.title }}</p>
                             <p class="text-muted-foreground text-xs">/projects/{{ project.slug }}</p>
@@ -299,5 +390,28 @@ onMounted(load)
                 </TableBody>
             </Table>
         </Card>
+
+        <div
+            v-if="showMediaPicker"
+            class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+            @click.self="showMediaPicker = false"
+        >
+            <div class="bg-background max-h-[85vh] w-full max-w-4xl overflow-auto rounded-xl border p-4 shadow-xl">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <strong>Choose cover image</strong>
+                    <Button size="sm" variant="ghost" @click="showMediaPicker = false">
+                        <X class="size-4" />
+                    </Button>
+                </div>
+                <MediaPanel
+                    :items="mediaFiles"
+                    :csrf="csrf"
+                    :api="api"
+                    selectable
+                    @refreshed="mediaFiles = $event"
+                    @select="pickCover"
+                />
+            </div>
+        </div>
     </section>
 </template>

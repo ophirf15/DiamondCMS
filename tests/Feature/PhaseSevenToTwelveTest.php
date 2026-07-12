@@ -34,6 +34,7 @@ class PhaseSevenToTwelveTest extends TestCase
             'visibility' => 'public',
             'is_featured' => true,
             'summary' => 'A property-management portal.',
+            'cover_image' => '/brand/logo-primary-gold.svg',
             'skills' => ['Laravel', 'MySQL'],
         ], $admin->id);
 
@@ -43,7 +44,9 @@ class PhaseSevenToTwelveTest extends TestCase
         ])->toHtml();
 
         $this->assertStringContainsString('Resident Portal', $html);
-        $this->get('/projects?skill=Laravel')->assertOk()->assertSee('Resident Portal');
+        $this->assertStringContainsString('dc-project-thumb', $html);
+        $this->assertStringContainsString('/brand/logo-primary-gold.svg', $html);
+        $this->get('/projects?skill=Laravel')->assertOk()->assertSee('Resident Portal')->assertSee('dc-project-thumb', false);
     }
 
     public function test_public_form_submission_is_validated_stored_and_exported_as_csv(): void

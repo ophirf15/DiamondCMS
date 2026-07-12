@@ -350,16 +350,18 @@ onMounted(() => {
                 </template>
                 <template v-else>
                     <p class="dc-live-panel-hint">Add ready-made sections onto the live page.</p>
-                    <button
-                        v-for="kit in SECTION_KITS"
-                        :key="kit.id"
-                        type="button"
-                        class="dc-live-kit"
-                        @click="addKit(kit.id)"
-                    >
-                        <strong>{{ kit.label }}</strong>
-                        <span>{{ kit.description }}</span>
-                    </button>
+                    <div class="dc-live-kits">
+                        <button
+                            v-for="kit in SECTION_KITS"
+                            :key="kit.id"
+                            type="button"
+                            class="dc-live-kit"
+                            @click="addKit(kit.id)"
+                        >
+                            <strong>{{ kit.label }}</strong>
+                            <span>{{ kit.description }}</span>
+                        </button>
+                    </div>
                 </template>
             </aside>
 

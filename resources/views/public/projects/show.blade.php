@@ -3,6 +3,9 @@
 @section('content')
     <article class="dc-section">
         <p><a href="{{ route('projects.index') }}">All projects</a></p>
+        @if (! empty($project->cover_image))
+            <img class="dc-project-hero" src="{{ $project->cover_image }}" alt="" loading="eager">
+        @endif
         <h1>{{ $project->title }}</h1>
         @if ($project->summary)<p class="lead">{{ $project->summary }}</p>@endif
         @if (! empty($project->skills))

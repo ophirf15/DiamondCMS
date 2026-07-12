@@ -57,6 +57,8 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             'year' => ['nullable', 'integer'],
             'started_on' => ['nullable', 'date'],
             'completed_on' => ['nullable', 'date'],
+            'cover_image' => ['nullable', 'string', 'max:500'],
+            'url' => ['nullable', 'url'],
             'builder_json' => ['nullable', 'array'],
         ]);
 
@@ -858,6 +860,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'summary' => ['nullable', 'string'],
                 'case_study' => ['nullable', 'string'],
                 'url' => ['nullable', 'url'],
+                'cover_image' => ['nullable', 'string', 'max:500'],
                 'skills' => ['nullable', 'array'],
             ]);
             $id = $portfolio->createProject($data, $request->user()->id);
@@ -874,6 +877,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'visibility' => ['sometimes', 'in:public,private'],
                 'is_featured' => ['sometimes', 'boolean'],
                 'url' => ['nullable', 'url'],
+                'cover_image' => ['nullable', 'string', 'max:500'],
                 'skills' => ['nullable', 'array'],
             ]);
             if (isset($data['skills'])) {

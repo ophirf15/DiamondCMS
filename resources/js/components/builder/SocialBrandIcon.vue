@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { getBrandIcon, guessIconSlug, iconSvgMarkup } from '@/lib/simpleIconsCatalog'
+import { cdnIconUrl, getLocalIcon, guessIconSlug, iconSvgMarkup, isLocalIconSlug } from '@/lib/simpleIconsCatalog'
 
 const props = withDefaults(defineProps<{
     slug?: string | null
@@ -16,14 +16,22 @@ const props = withDefaults(defineProps<{
     size: 20,
 })
 
-const icon = computed(() => {
-    const resolved = props.slug || guessIconSlug(props.label, props.url)
-    return getBrandIcon(resolved)
+const resolvedSlug = computed(() => {
+    const explicit = (props.slug || '').trim()
+    if (explicit) return explicit
+    return guessIconSlug(props.label, props.url)
 })
 
+const local = computed(() => getLocalIcon(resolvedSlug.value))
+
 const markup = computed(() => {
-    if (!icon.value) return ''
-    return iconSvgMarkup(icon.value, props.colored)
+    if (!local.value) return ''
+    return iconSvgMarkup(local.value, props.colored)
+})
+
+const cdnSrc = computed(() => {
+    if (isLocalIconSlug(resolvedSlug.value)) return ''
+    return cdnIconUrl(resolvedSlug.value)
 })
 </script>
 
@@ -32,8 +40,19 @@ const markup = computed(() => {
         class="dc-social-icon inline-flex shrink-0 items-center justify-center"
         :style="{ width: `${size}px`, height: `${size}px` }"
         aria-hidden="true"
-        v-html="markup"
-    />
+    >
+        <span v-if="local" class="contents" v-html="markup" />
+        <img
+            v-else
+            :src="cdnSrc"
+            alt=""
+            width="24"
+            height="24"
+            loading="lazy"
+            decoding="async"
+            class="h-full w-full"
+        >
+    </span>
 </template>
 
 <style scoped>

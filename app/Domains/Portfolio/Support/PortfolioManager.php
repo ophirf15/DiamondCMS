@@ -51,7 +51,8 @@ final class PortfolioManager
             'tags' => json_encode(array_values($data['tags'] ?? []), JSON_THROW_ON_ERROR),
             'metrics' => json_encode($data['metrics'] ?? [], JSON_THROW_ON_ERROR),
             'before_after_media' => json_encode($data['before_after_media'] ?? [], JSON_THROW_ON_ERROR),
-            'gallery' => json_encode($data['gallery'] ?? [], JSON_THROW_ON_ERROR),
+            'gallery' => json_encode(self::normalizeGallery($data['gallery'] ?? []), JSON_THROW_ON_ERROR),
+            'logos' => json_encode(self::normalizeLogos($data['logos'] ?? []), JSON_THROW_ON_ERROR),
             'builder_json' => json_encode($data['builder_json'] ?? BuilderDocument::empty($title), JSON_THROW_ON_ERROR),
             'meta_title' => $data['meta_title'] ?? $title,
             'meta_description' => $data['meta_description'] ?? $data['summary'] ?? null,
@@ -77,6 +78,121 @@ final class PortfolioManager
             'deleted_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function updateProject(int $projectId, array $data, ?int $userId = null): ?object
+    {
+        $payload = [];
+        foreach (['category_id', 'title', 'slug', 'type', 'status', 'visibility', 'is_featured', 'sort_order', 'started_on', 'completed_on', 'year', 'client', 'role', 'url', 'repository_url', 'cover_image', 'summary', 'case_study', 'meta_title', 'meta_description'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $payload[$field] = $data[$field];
+            }
+        }
+
+        if (array_key_exists('skills', $data)) {
+            $payload['skills'] = json_encode(array_values(is_array($data['skills']) ? $data['skills'] : []), JSON_THROW_ON_ERROR);
+        }
+        if (array_key_exists('tags', $data)) {
+            $payload['tags'] = json_encode(array_values(is_array($data['tags']) ? $data['tags'] : []), JSON_THROW_ON_ERROR);
+        }
+        if (array_key_exists('gallery', $data)) {
+            $payload['gallery'] = json_encode(self::normalizeGallery($data['gallery']), JSON_THROW_ON_ERROR);
+        }
+        if (array_key_exists('logos', $data)) {
+            $payload['logos'] = json_encode(self::normalizeLogos($data['logos']), JSON_THROW_ON_ERROR);
+        }
+        if (array_key_exists('metrics', $data)) {
+            $payload['metrics'] = json_encode(is_array($data['metrics']) ? $data['metrics'] : [], JSON_THROW_ON_ERROR);
+        }
+
+        if (($payload['status'] ?? null) === 'published') {
+            $payload['published_at'] = $data['published_at'] ?? now();
+        }
+
+        $payload['updated_by'] = $userId;
+        $payload['updated_at'] = now();
+
+        DB::table('projects')->where('id', $projectId)->whereNull('deleted_at')->update($payload);
+
+        $row = DB::table('projects')->where('id', $projectId)->first();
+
+        return $row ? $this->decodeProject($row) : null;
+    }
+
+    /** @return Collection<int, object> */
+    public function adminProjects(): Collection
+    {
+        return DB::table('projects')
+            ->whereNull('deleted_at')
+            ->orderByDesc('updated_at')
+            ->get()
+            ->map(fn (object $project) => $this->decodeProject($project));
+    }
+
+    /**
+     * @param  mixed  $gallery
+     * @return list<array{src: string, alt: string}>
+     */
+    public static function normalizeGallery(mixed $gallery): array
+    {
+        if (! is_array($gallery)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($gallery as $row) {
+            if (is_string($row) && trim($row) !== '') {
+                $items[] = ['src' => trim($row), 'alt' => ''];
+                continue;
+            }
+            if (! is_array($row)) {
+                continue;
+            }
+            $src = trim((string) ($row['src'] ?? $row['url'] ?? ''));
+            if ($src === '') {
+                continue;
+            }
+            $items[] = [
+                'src' => $src,
+                'alt' => trim((string) ($row['alt'] ?? '')),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  mixed  $logos
+     * @return list<array{label: string, icon: string, image: string, url: string}>
+     */
+    public static function normalizeLogos(mixed $logos): array
+    {
+        if (! is_array($logos)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($logos as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $label = trim((string) ($row['label'] ?? ''));
+            $icon = strtolower(trim((string) ($row['icon'] ?? '')));
+            $image = trim((string) ($row['image'] ?? ''));
+            $url = trim((string) ($row['url'] ?? ''));
+            if ($label === '' && $icon === '' && $image === '') {
+                continue;
+            }
+            $items[] = [
+                'label' => $label !== '' ? $label : ($icon !== '' ? $icon : 'Logo'),
+                'icon' => preg_replace('/[^a-z0-9]/', '', $icon) ?: '',
+                'image' => $image,
+                'url' => $url,
+            ];
+        }
+
+        return $items;
     }
 
     public function restore(int $projectId): void
@@ -150,11 +266,43 @@ final class PortfolioManager
         return $this->publicProjects(['featured' => true])->take($limit)->values();
     }
 
+    public function projectCardHtml(object $project, string $heading = 'h3'): string
+    {
+        $url = e(route('projects.show', $project->slug));
+        $title = e((string) $project->title);
+        $summary = e((string) ($project->summary ?? ''));
+        $cover = trim((string) ($project->cover_image ?? ''));
+
+        $thumb = $cover !== ''
+            ? '<a class="dc-project-thumb-link" href="'.$url.'"><img class="dc-project-thumb" src="'.e($cover).'" alt="" loading="lazy" decoding="async"></a>'
+            : '<a class="dc-project-thumb-link dc-project-thumb-link--empty" href="'.$url.'" aria-hidden="true"><span class="dc-project-thumb dc-project-thumb--empty"></span></a>';
+
+        $summaryHtml = $summary !== '' ? '<p>'.$summary.'</p>' : '';
+
+        return '<article class="dc-project-card">'
+            .$thumb
+            .'<div class="dc-project-card-body">'
+            .'<'.$heading.'><a href="'.$url.'">'.$title.'</a></'.$heading.'>'
+            .$summaryHtml
+            .'</div></article>';
+    }
+
     private function decodeProject(object $project): object
     {
-        foreach (['skills', 'tags', 'metrics', 'before_after_media', 'gallery', 'builder_json'] as $field) {
-            $project->{$field} = json_decode((string) ($project->{$field} ?? '[]'), true) ?: [];
+        foreach (['skills', 'tags', 'metrics', 'before_after_media', 'gallery', 'logos', 'builder_json'] as $field) {
+            if (! property_exists($project, $field) && ! isset($project->{$field})) {
+                $project->{$field} = [];
+                continue;
+            }
+            $raw = $project->{$field} ?? null;
+            if (is_array($raw)) {
+                continue;
+            }
+            $project->{$field} = json_decode((string) ($raw ?? '[]'), true) ?: [];
         }
+
+        $project->gallery = self::normalizeGallery($project->gallery ?? []);
+        $project->logos = self::normalizeLogos($project->logos ?? []);
 
         return $project;
     }
