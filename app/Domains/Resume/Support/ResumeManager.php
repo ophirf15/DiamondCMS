@@ -19,15 +19,106 @@ final class ResumeManager
             'user_id' => $userId,
             'name' => $data['name'],
             'headline' => $data['headline'] ?? null,
-            'email' => $data['email'] ?? null,
-            'phone' => $data['phone'] ?? null,
-            'location' => $data['location'] ?? null,
-            'website' => $data['website'] ?? null,
+            'email' => self::nullableString($data['email'] ?? null),
+            'phone' => self::nullableString($data['phone'] ?? null),
+            'location' => self::nullableString($data['location'] ?? null),
+            'website' => self::normalizeWebsite($data['website'] ?? null),
             'summary' => $data['summary'] ?? null,
-            'links' => json_encode($data['links'] ?? [], JSON_THROW_ON_ERROR),
+            'links' => json_encode(self::normalizeLinks($data['links'] ?? []), JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function updateProfile(int $profileId, array $data): object
+    {
+        $payload = ['updated_at' => now()];
+        foreach (['name', 'headline', 'summary'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $payload[$key] = $data[$key];
+            }
+        }
+        foreach (['email', 'phone', 'location'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $payload[$key] = self::nullableString($data[$key]);
+            }
+        }
+        if (array_key_exists('website', $data)) {
+            $payload['website'] = self::normalizeWebsite($data['website']);
+        }
+        if (array_key_exists('links', $data)) {
+            $payload['links'] = json_encode(self::normalizeLinks($data['links']), JSON_THROW_ON_ERROR);
+        }
+
+        DB::table('resume_profiles')->where('id', $profileId)->update($payload);
+
+        return DB::table('resume_profiles')->where('id', $profileId)->firstOrFail();
+    }
+
+    public static function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = trim((string) $value);
+
+        return $text === '' ? null : $text;
+    }
+
+    public static function normalizeWebsite(mixed $value): ?string
+    {
+        $text = self::nullableString($value);
+        if ($text === null) {
+            return null;
+        }
+        if (! preg_match('#^https?://#i', $text)) {
+            $text = 'https://'.$text;
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param  mixed  $links
+     * @return list<array{label: string, url: string}>
+     */
+    public static function normalizeLinks(mixed $links): array
+    {
+        if (! is_array($links)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($links as $link) {
+            if (! is_array($link)) {
+                continue;
+            }
+            $label = self::nullableString($link['label'] ?? null) ?? '';
+            $url = self::normalizeWebsite($link['url'] ?? null);
+            if ($url === null) {
+                continue;
+            }
+            if ($label === '') {
+                $host = parse_url($url, PHP_URL_HOST) ?: $url;
+                $label = is_string($host) ? preg_replace('#^www\.#i', '', $host) ?? $host : $url;
+            }
+            $normalized[] = ['label' => $label, 'url' => $url];
+        }
+
+        return $normalized;
+    }
+
+    /** @return list<array{label: string, url: string}> */
+    public static function profileLinks(object $profile): array
+    {
+        $raw = $profile->links ?? null;
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+
+        return self::normalizeLinks($raw);
     }
 
     public function createVariant(int $profileId, array $data): int
@@ -42,8 +133,83 @@ final class ResumeManager
             'hidden_sections' => json_encode($data['hidden_sections'] ?? [], JSON_THROW_ON_ERROR),
             'skill_overrides' => json_encode($data['skill_overrides'] ?? [], JSON_THROW_ON_ERROR),
             'builder_json' => json_encode($data['builder_json'] ?? null, JSON_THROW_ON_ERROR),
+            'download_pdf' => $data['download_pdf'] ?? null,
+            'download_docx' => $data['download_docx'] ?? null,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+    }
+
+    public function deleteProfile(int $profileId): void
+    {
+        DB::table('resume_profiles')->where('id', $profileId)->delete();
+    }
+
+    public function deleteVariant(int $variantId): void
+    {
+        DB::table('resume_variants')->where('id', $variantId)->delete();
+    }
+
+    /** @param \Illuminate\Support\Collection<int, object>|iterable<int, object> $sections */
+    public static function groupSections(iterable $sections): array
+    {
+        $grouped = [];
+        foreach ($sections as $section) {
+            $type = (string) ($section->type ?? 'other');
+            if ($type === 'work' || $type === 'employment') {
+                $type = 'experience';
+            }
+            $grouped[$type] ??= [];
+            $grouped[$type][] = $section;
+        }
+
+        return $grouped;
+    }
+
+    public static function sectionTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'experience', 'work', 'employment' => 'Experience',
+            'education' => 'Education',
+            'skills' => 'Skills',
+            'project' => 'Projects',
+            'award' => 'Awards',
+            'certification' => 'Certifications',
+            default => 'Additional',
+        };
+    }
+
+    public function downloadFileResponse(object $variant, string $format)
+    {
+        $path = match ($format) {
+            'pdf' => (string) ($variant->download_pdf ?? ''),
+            'docx' => (string) ($variant->download_docx ?? ''),
+            default => '',
+        };
+        abort_if($path === '', 404);
+
+        $absolute = public_path(ltrim(parse_url($path, PHP_URL_PATH) ?: $path, '/'));
+        if (str_starts_with($path, '/storage/')) {
+            $absolute = storage_path('app/public/'.ltrim(substr($path, strlen('/storage/')), '/'));
+        } elseif (str_starts_with($path, 'storage/')) {
+            $absolute = storage_path('app/public/'.ltrim(substr($path, strlen('storage/')), '/'));
+        }
+
+        if (! is_file($absolute)) {
+            // Fall back to redirect for absolute/external URLs or public paths Vite/media serve.
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+                return redirect()->away($path);
+            }
+            abort(404);
+        }
+
+        $filename = basename($absolute);
+        $mime = $format === 'docx'
+            ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            : 'application/pdf';
+
+        return response()->download($absolute, $filename, [
+            'Content-Type' => $mime,
         ]);
     }
 
@@ -359,6 +525,7 @@ final class ResumeManager
             in_array($normalized, ['skills', 'skill', 'technical skills', 'core skills', 'abilities'], true) => 'skills',
             in_array($normalized, ['projects', 'project', 'selected work', 'portfolio'], true) => 'project',
             in_array($normalized, ['awards', 'award', 'honors'], true) => 'award',
+            in_array($normalized, ['certifications', 'certification', 'certificates', 'licenses', 'licence', 'licences'], true) => 'certification',
             default => null,
         };
     }

@@ -272,14 +272,19 @@ final class PortfolioManager
         $title = e((string) $project->title);
         $summary = e((string) ($project->summary ?? ''));
         $cover = trim((string) ($project->cover_image ?? ''));
+        $fit = \App\Domains\Design\Support\DesignManager::portfolioAttr(
+            'cardFit',
+            \App\Domains\Design\Support\DesignManager::portfolioMediaFits(),
+            'contain'
+        );
 
         $thumb = $cover !== ''
-            ? '<a class="dc-project-thumb-link" href="'.$url.'"><img class="dc-project-thumb" src="'.e($cover).'" alt="" loading="lazy" decoding="async"></a>'
-            : '<a class="dc-project-thumb-link dc-project-thumb-link--empty" href="'.$url.'" aria-hidden="true"><span class="dc-project-thumb dc-project-thumb--empty"></span></a>';
+            ? '<a class="dc-project-thumb-link" href="'.$url.'"><span class="dc-media-frame dc-media-frame--'.$fit.'"><img class="dc-media-fit" src="'.e($cover).'" alt="" loading="lazy" decoding="async"></span></a>'
+            : '<a class="dc-project-thumb-link dc-project-thumb-link--empty" href="'.$url.'" aria-hidden="true"><span class="dc-media-frame dc-media-frame--empty"></span></a>';
 
         $summaryHtml = $summary !== '' ? '<p>'.$summary.'</p>' : '';
 
-        return '<article class="dc-project-card">'
+        return '<article class="dc-project-card dc-project-card--fit-'.$fit.'">'
             .$thumb
             .'<div class="dc-project-card-body">'
             .'<'.$heading.'><a href="'.$url.'">'.$title.'</a></'.$heading.'>'

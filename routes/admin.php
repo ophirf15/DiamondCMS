@@ -203,9 +203,11 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
         'id' => $backups->backup($request->string('type', 'full')->toString(), $request->user()->id),
     ]))->name('backups.store');
 
-    Route::post('/exports', fn (Request $request, BackupManager $backups) => response()->json([
-        'path' => $backups->exportSite($request->user()->id),
-    ]))->name('exports.store');
+    Route::post('/exports', function (Request $request, BackupManager $backups) {
+        $export = $backups->exportSite($request->user()->id);
+
+        return response()->json($export);
+    })->name('exports.store');
 
     Route::post('/imports/dry-run', function (Request $request, BackupManager $backups) {
         $data = $request->validate(['path' => ['required', 'string'], 'mode' => ['nullable', 'in:dry-run,merge,replace']]);
@@ -733,24 +735,44 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
 
         Route::get('/resumes', fn () => response()->json(DB::table('resume_profiles')->orderByDesc('updated_at')->get()));
         Route::post('/resumes', function (Request $request, ResumeManager $resumes) {
-            $data = $request->validate(['name' => ['required', 'string'], 'headline' => ['nullable', 'string'], 'summary' => ['nullable', 'string'], 'email' => ['nullable', 'email'], 'phone' => ['nullable', 'string'], 'location' => ['nullable', 'string'], 'website' => ['nullable', 'url']]);
+            $data = $request->validate([
+                'name' => ['required', 'string'],
+                'headline' => ['nullable', 'string'],
+                'summary' => ['nullable', 'string'],
+                'email' => ['nullable', 'string', 'max:255'],
+                'phone' => ['nullable', 'string', 'max:255'],
+                'location' => ['nullable', 'string', 'max:255'],
+                'website' => ['nullable', 'string', 'max:500'],
+                'links' => ['nullable', 'array'],
+                'links.*.label' => ['nullable', 'string', 'max:120'],
+                'links.*.url' => ['nullable', 'string', 'max:500'],
+            ]);
             $id = $resumes->createProfile($data, $request->user()->id);
 
             return response()->json(DB::table('resume_profiles')->where('id', $id)->first(), 201);
         });
-        Route::put('/resumes/{profile}', function (int $profile, Request $request) {
+        Route::put('/resumes/{profile}', function (int $profile, Request $request, ResumeManager $resumes) {
+            abort_unless(DB::table('resume_profiles')->where('id', $profile)->exists(), 404);
             $data = $request->validate([
                 'name' => ['sometimes', 'string'],
                 'headline' => ['nullable', 'string'],
                 'summary' => ['nullable', 'string'],
-                'email' => ['nullable', 'email'],
-                'phone' => ['nullable', 'string'],
-                'location' => ['nullable', 'string'],
-                'website' => ['nullable', 'url'],
+                'email' => ['nullable', 'string', 'max:255'],
+                'phone' => ['nullable', 'string', 'max:255'],
+                'location' => ['nullable', 'string', 'max:255'],
+                'website' => ['nullable', 'string', 'max:500'],
+                'links' => ['nullable', 'array'],
+                'links.*.label' => ['nullable', 'string', 'max:120'],
+                'links.*.url' => ['nullable', 'string', 'max:500'],
             ]);
-            DB::table('resume_profiles')->where('id', $profile)->update(array_merge($data, ['updated_at' => now()]));
 
-            return response()->json(DB::table('resume_profiles')->where('id', $profile)->first());
+            return response()->json($resumes->updateProfile($profile, $data));
+        });
+        Route::delete('/resumes/{profile}', function (int $profile, ResumeManager $resumes) {
+            abort_unless(DB::table('resume_profiles')->where('id', $profile)->exists(), 404);
+            $resumes->deleteProfile($profile);
+
+            return response()->noContent();
         });
         Route::get('/resumes/{profile}/sections', fn (int $profile) => response()->json(
             DB::table('resume_sections')->where('resume_profile_id', $profile)->orderBy('sort_order')->get()
@@ -759,13 +781,21 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             $data = $request->validate(['sections' => ['required', 'array']]);
             DB::table('resume_sections')->where('resume_profile_id', $profile)->delete();
             foreach ($data['sections'] as $index => $section) {
+                $meta = is_array($section['metadata'] ?? null) ? $section['metadata'] : [];
+                if (array_key_exists('date', $section)) {
+                    $meta['date'] = $section['date'];
+                }
                 DB::table('resume_sections')->insert([
                     'resume_profile_id' => $profile,
                     'type' => $section['type'] ?? 'experience',
                     'title' => $section['title'] ?? null,
                     'organization' => $section['organization'] ?? null,
+                    'location' => $section['location'] ?? null,
+                    'starts_on' => $section['starts_on'] ?? null,
+                    'ends_on' => $section['ends_on'] ?? null,
+                    'is_current' => (bool) ($section['is_current'] ?? false),
                     'bullets' => json_encode($section['bullets'] ?? [], JSON_THROW_ON_ERROR),
-                    'metadata' => json_encode($section['metadata'] ?? [], JSON_THROW_ON_ERROR),
+                    'metadata' => json_encode($meta, JSON_THROW_ON_ERROR),
                     'sort_order' => $index,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -817,21 +847,47 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
         });
         Route::post('/resumes/import/{import}/approve', fn (int $import, ResumeManager $resumes) => response()->json(['resume_profile_id' => $resumes->approveImport($import)]));
         Route::post('/resumes/{profile}/variants', function (int $profile, Request $request, ResumeManager $resumes) {
-            $data = $request->validate(['name' => ['required', 'string'], 'visibility' => ['nullable', 'in:public,private'], 'summary_override' => ['nullable', 'string']]);
+            $data = $request->validate([
+                'name' => ['required', 'string'],
+                'visibility' => ['nullable', 'in:public,private'],
+                'summary_override' => ['nullable', 'string'],
+                'download_pdf' => ['nullable', 'string'],
+                'download_docx' => ['nullable', 'string'],
+            ]);
             $id = $resumes->createVariant($profile, $data);
 
             return response()->json(DB::table('resume_variants')->where('id', $id)->first(), 201);
         });
         Route::put('/resume-variants/{variant}', function (int $variant, Request $request) {
+            abort_unless(DB::table('resume_variants')->where('id', $variant)->exists(), 404);
             $data = $request->validate([
-                'name' => ['sometimes', 'string'],
+                'name' => ['sometimes', 'string', 'max:190'],
+                'slug' => ['sometimes', 'string', 'max:190', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
                 'visibility' => ['sometimes', 'in:public,private'],
                 'summary_override' => ['nullable', 'string'],
+                'download_pdf' => ['nullable', 'string'],
+                'download_docx' => ['nullable', 'string'],
             ]);
+            if (array_key_exists('slug', $data)) {
+                $slug = Str::slug($data['slug']);
+                abort_if($slug === '', 422, 'Slug must contain letters or numbers.');
+                $taken = DB::table('resume_variants')
+                    ->where('slug', $slug)
+                    ->where('id', '!=', $variant)
+                    ->exists();
+                abort_if($taken, 422, 'That slug is already in use.');
+                $data['slug'] = $slug;
+            }
             $data['updated_at'] = now();
             DB::table('resume_variants')->where('id', $variant)->update($data);
 
             return response()->json(DB::table('resume_variants')->where('id', $variant)->first());
+        });
+        Route::delete('/resume-variants/{variant}', function (int $variant, ResumeManager $resumes) {
+            abort_unless(DB::table('resume_variants')->where('id', $variant)->exists(), 404);
+            $resumes->deleteVariant($variant);
+
+            return response()->noContent();
         });
         Route::post('/resume-variants/{variant}/share', function (int $variant, Request $request) {
             $token = Str::random(48);
@@ -848,7 +904,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
 
             return response()->json(DB::table('portfolio_categories')->where('id', $id)->first(), 201);
         });
-        Route::get('/portfolio/projects', fn () => response()->json(DB::table('projects')->whereNull('deleted_at')->orderByDesc('updated_at')->get()));
+        Route::get('/portfolio/projects', fn (PortfolioManager $portfolio) => response()->json($portfolio->adminProjects()));
         Route::post('/portfolio/projects', function (Request $request, PortfolioManager $portfolio) {
             $data = $request->validate([
                 'category_id' => ['nullable', 'integer'],
@@ -862,12 +918,20 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'url' => ['nullable', 'url'],
                 'cover_image' => ['nullable', 'string', 'max:500'],
                 'skills' => ['nullable', 'array'],
+                'gallery' => ['nullable', 'array'],
+                'gallery.*.src' => ['required_with:gallery', 'string', 'max:500'],
+                'gallery.*.alt' => ['nullable', 'string', 'max:190'],
+                'logos' => ['nullable', 'array'],
+                'logos.*.label' => ['nullable', 'string', 'max:120'],
+                'logos.*.icon' => ['nullable', 'string', 'max:80'],
+                'logos.*.image' => ['nullable', 'string', 'max:500'],
+                'logos.*.url' => ['nullable', 'string', 'max:500'],
             ]);
             $id = $portfolio->createProject($data, $request->user()->id);
 
             return response()->json(DB::table('projects')->where('id', $id)->first(), 201);
         });
-        Route::put('/portfolio/projects/{project}', function (int $project, Request $request) {
+        Route::put('/portfolio/projects/{project}', function (int $project, Request $request, PortfolioManager $portfolio) {
             $data = $request->validate([
                 'category_id' => ['nullable', 'integer'],
                 'title' => ['sometimes', 'string'],
@@ -879,18 +943,19 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'url' => ['nullable', 'url'],
                 'cover_image' => ['nullable', 'string', 'max:500'],
                 'skills' => ['nullable', 'array'],
+                'gallery' => ['nullable', 'array'],
+                'gallery.*.src' => ['required_with:gallery', 'string', 'max:500'],
+                'gallery.*.alt' => ['nullable', 'string', 'max:190'],
+                'logos' => ['nullable', 'array'],
+                'logos.*.label' => ['nullable', 'string', 'max:120'],
+                'logos.*.icon' => ['nullable', 'string', 'max:80'],
+                'logos.*.image' => ['nullable', 'string', 'max:500'],
+                'logos.*.url' => ['nullable', 'string', 'max:500'],
             ]);
-            if (isset($data['skills'])) {
-                $data['skills'] = json_encode(array_values($data['skills']), JSON_THROW_ON_ERROR);
-            }
-            if (($data['status'] ?? null) === 'published') {
-                $data['published_at'] = now();
-            }
-            $data['updated_by'] = $request->user()->id;
-            $data['updated_at'] = now();
-            DB::table('projects')->where('id', $project)->whereNull('deleted_at')->update($data);
 
-            return response()->json(DB::table('projects')->where('id', $project)->first());
+            $updated = $portfolio->updateProject($project, $data, $request->user()->id);
+
+            return response()->json($updated);
         });
         Route::delete('/portfolio/projects/{project}', function (int $project, PortfolioManager $portfolio) {
             $portfolio->softDelete($project);
@@ -993,13 +1058,46 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             ], 201);
         });
         Route::post('/exports', function (Request $request, BackupManager $backups) {
-            $path = $backups->exportSite($request->user()->id);
+            $export = $backups->exportSite($request->user()->id);
 
             return response()->json([
-                'path' => $path,
-                'filename' => basename($path),
-                'note' => 'Export written on the server (secrets excluded). Download via hosting file access if needed.',
+                ...$export,
+                'download_url' => url('/admin/api/exports/download/'.rawurlencode($export['filename'])),
+                'note' => sprintf(
+                    'Complete site package ready: %d files (%d media library). Secrets excluded.',
+                    (int) ($export['media_files'] ?? 0),
+                    (int) ($export['media_library_files'] ?? 0),
+                ),
             ]);
+        });
+        Route::get('/exports/download/{filename}', function (string $filename, BackupManager $backups) {
+            $filename = basename(urldecode($filename));
+            abort_unless(preg_match('/^diamondcms-site-[\w\-]+\.zip$/', $filename) === 1, 404);
+            $absolute = $backups->exportAbsolutePath('exports/'.$filename);
+
+            return response()->download($absolute, $filename, [
+                'Content-Type' => 'application/zip',
+            ]);
+        })->where('filename', '.*');
+        Route::post('/imports/upload', function (Request $request, BackupManager $backups) {
+            $data = $request->validate([
+                'package' => ['required', 'file', 'max:512000'],
+                'mode' => ['nullable', 'in:merge,replace'],
+            ]);
+            $file = $request->file('package');
+            abort_unless(
+                $file && strtolower($file->getClientOriginalExtension()) === 'zip',
+                422,
+                'Upload a .zip site package.',
+            );
+
+            return response()->json(
+                $backups->importUploadedPackage(
+                    $file,
+                    $data['mode'] ?? 'replace',
+                    $request->user()->id,
+                )
+            );
         });
         Route::post('/backups/{backup}/restore', fn (int $backup, BackupManager $backups) => response()->json(
             $backups->restore($backup),

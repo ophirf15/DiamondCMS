@@ -279,4 +279,101 @@ TXT);
         $this->assertStringContainsString('var(--dc-bg)', $css);
         $this->assertStringContainsString('var(--dc-primary)', $css);
     }
+
+    public function test_public_resume_uses_theme_layout_and_grouped_sections(): void
+    {
+        DesignManager::saveTokens([
+            'resume' => [
+                'density' => 'compact',
+                'sectionRhythm' => 'tight',
+                'experienceStyle' => 'timeline',
+            ],
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $resumes = app(ResumeManager::class);
+        $profileId = $resumes->createProfile([
+            'name' => 'Jordan Lee',
+            'headline' => 'Engineer',
+            'summary' => 'Builds products.',
+        ], $admin->id);
+
+        DB::table('resume_sections')->insert([
+            [
+                'resume_profile_id' => $profileId,
+                'type' => 'experience',
+                'title' => 'Engineer',
+                'organization' => 'Acme',
+                'bullets' => json_encode(['Shipped CMS']),
+                'metadata' => json_encode(['date' => '2024']),
+                'sort_order' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'resume_profile_id' => $profileId,
+                'type' => 'award',
+                'title' => 'Hackathon Winner',
+                'organization' => 'DevConf',
+                'bullets' => json_encode([]),
+                'metadata' => json_encode(['date' => '2023']),
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $variantId = $resumes->createVariant($profileId, [
+            'name' => 'Public CV',
+            'visibility' => 'public',
+            'download_pdf' => '/storage/resumes/jordan.pdf',
+            'download_docx' => '/storage/resumes/jordan.docx',
+        ]);
+        $slug = DB::table('resume_variants')->where('id', $variantId)->value('slug');
+
+        $page = $this->get('/resume/'.$slug)->assertOk();
+        $page->assertSee('data-dc-resume-density="compact"', false);
+        $page->assertSee('data-dc-resume-experience="timeline"', false);
+        $page->assertSee('dc-resume-group--award', false);
+        $page->assertSee('Awards');
+        $page->assertSee('Hackathon Winner');
+        $page->assertSee('Download resume');
+        $page->assertSee('/resume/'.$slug.'/download/pdf', false);
+        $page->assertSee('/resume/'.$slug.'/download/docx', false);
+
+        $this->actingAs($admin)->deleteJson('/admin/api/resumes/'.$profileId)->assertNoContent();
+        $this->assertDatabaseMissing('resume_profiles', ['id' => $profileId]);
+        $this->get('/resume/'.$slug)->assertNotFound();
+    }
+
+    public function test_resume_profile_saves_location_website_and_links(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $resumes = app(ResumeManager::class);
+        $profileId = $resumes->createProfile([
+            'name' => 'Jordan Lee',
+            'email' => 'jordan@example.com',
+        ], $admin->id);
+
+        $this->actingAs($admin)->putJson('/admin/api/resumes/'.$profileId, [
+            'name' => 'Jordan Lee',
+            'email' => 'jordan@example.com',
+            'location' => 'San Francisco, CA',
+            'website' => 'ophiryahalom.com',
+            'links' => [
+                ['label' => 'GitHub', 'url' => 'github.com/jordan'],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('location', 'San Francisco, CA')
+            ->assertJsonPath('website', 'https://ophiryahalom.com')
+            ->assertJsonPath('email', 'jordan@example.com');
+
+        $profile = DB::table('resume_profiles')->where('id', $profileId)->first();
+        $this->assertSame('San Francisco, CA', $profile->location);
+        $this->assertSame('https://ophiryahalom.com', $profile->website);
+        $this->assertSame('jordan@example.com', $profile->email);
+        $links = json_decode((string) $profile->links, true);
+        $this->assertSame('GitHub', $links[0]['label']);
+        $this->assertSame('https://github.com/jordan', $links[0]['url']);
+    }
 }

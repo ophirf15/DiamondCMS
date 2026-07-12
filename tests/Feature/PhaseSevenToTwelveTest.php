@@ -189,4 +189,60 @@ class PhaseSevenToTwelveTest extends TestCase
         $this->assertSame('After', json_decode((string) DB::table('settings')->where('key', 'site_name')->value('value'), true));
         @unlink($zipPath);
     }
+
+    public function test_full_site_export_includes_media_and_replace_import_restores_files(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        Storage::disk('public')->put('media/export-probe.txt', 'local-build-asset');
+        DB::table('settings')->insert([
+            'key' => 'site_name',
+            'value' => json_encode('Local Clone'),
+            'group' => 'general',
+            'is_public' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('media_items')->insert([
+            'folder_id' => null,
+            'disk' => 'public',
+            'path' => 'media/export-probe.txt',
+            'original_name' => 'export-probe.txt',
+            'mime_type' => 'text/plain',
+            'extension' => 'txt',
+            'size' => 17,
+            'sha256' => hash('sha256', 'local-build-asset'),
+            'alt_text' => null,
+            'caption' => null,
+            'credit' => null,
+            'metadata' => null,
+            'variants' => null,
+            'is_svg' => false,
+            'uploaded_by' => $admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $export = app(BackupManager::class)->exportSite($admin->id);
+        $this->assertFileExists($export['path']);
+        $this->assertGreaterThan(0, $export['media_files']);
+        $this->assertGreaterThan(0, $export['media_library_files']);
+        $this->assertSame([], $export['missing_media']);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($export['path']) === true);
+        $this->assertNotFalse($zip->locateName('files/public/media/export-probe.txt'));
+        $zip->close();
+
+        Storage::disk('public')->delete('media/export-probe.txt');
+        DB::table('settings')->where('key', 'site_name')->delete();
+        DB::table('media_items')->delete();
+
+        $result = app(BackupManager::class)->applyImport($export['path'], 'replace', $admin->id);
+
+        $this->assertTrue($result['ok']);
+        $this->assertGreaterThan(0, $result['media_files']);
+        $this->assertSame('local-build-asset', Storage::disk('public')->get('media/export-probe.txt'));
+        $this->assertSame('Local Clone', json_decode((string) DB::table('settings')->where('key', 'site_name')->value('value'), true));
+        $this->assertDatabaseHas('media_items', ['path' => 'media/export-probe.txt']);
+    }
 }

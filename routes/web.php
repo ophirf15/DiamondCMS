@@ -264,11 +264,27 @@ Route::get('/resume/share/{token}', function (string $token) {
     return view('public.resume', compact('variant', 'profile', 'sections'));
 })->name('resume.share');
 
+Route::get('/resume/{slug}/download/{format}', function (string $slug, string $format, ResumeManager $resumes) {
+    abort_unless(in_array($format, ['pdf', 'docx'], true), 404);
+    $variant = DB::table('resume_variants')->where('slug', $slug)->where('visibility', 'public')->firstOrFail();
+    try {
+        app(AnalyticsManager::class)->trackResumeDownload((int) $variant->id);
+    } catch (\Throwable) {
+    }
+
+    return $resumes->downloadFileResponse($variant, $format);
+})->name('resume.download');
+
 Route::get('/resume/{slug}/print', function (string $slug, ResumeManager $resumes) {
     $variant = DB::table('resume_variants')->where('slug', $slug)->where('visibility', 'public')->firstOrFail();
     try {
         app(AnalyticsManager::class)->trackResumeDownload((int) $variant->id);
     } catch (\Throwable) {
+    }
+
+    // Prefer curated PDF when available.
+    if (filled($variant->download_pdf ?? null)) {
+        return $resumes->downloadFileResponse($variant, 'pdf');
     }
 
     return $resumes->pdfResponse((int) $variant->id);

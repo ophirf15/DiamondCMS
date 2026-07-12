@@ -16,9 +16,13 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import MediaPanel, { type MediaItem } from '@/components/admin/MediaPanel.vue'
+import IconPicker from '@/components/ui/IconPicker.vue'
+import SocialBrandIcon from '@/components/builder/SocialBrandIcon.vue'
 import { toast } from 'vue-sonner'
 
 type Category = { id: number, name: string, slug: string }
+type GalleryItem = { src: string, alt: string }
+type LogoItem = { label: string, icon: string, image: string, url: string }
 
 type Project = {
     id: number
@@ -33,6 +37,23 @@ type Project = {
     cover_image?: string | null
     category_id?: number | null
     skills?: string | string[]
+    gallery?: GalleryItem[]
+    logos?: LogoItem[]
+}
+
+type ProjectForm = {
+    title: string
+    summary: string
+    case_study: string
+    status: string
+    visibility: string
+    is_featured: boolean
+    url: string
+    cover_image: string
+    skills: string
+    category_id: number | null
+    gallery: GalleryItem[]
+    logos: LogoItem[]
 }
 
 const props = defineProps<{
@@ -40,14 +61,7 @@ const props = defineProps<{
     csrf: string
 }>()
 
-const projects = ref<Project[]>([])
-const categories = ref<Category[]>([])
-const editing = ref<Project | null>(null)
-const newCategory = ref('')
-const mediaFiles = ref<MediaItem[]>([])
-const showMediaPicker = ref(false)
-const mediaTarget = ref<'create' | 'edit'>('create')
-const form = ref({
+const emptyForm = (): ProjectForm => ({
     title: '',
     summary: '',
     case_study: '',
@@ -57,8 +71,23 @@ const form = ref({
     url: '',
     cover_image: '',
     skills: '',
-    category_id: null as number | null,
+    category_id: null,
+    gallery: [],
+    logos: [],
 })
+
+const projects = ref<Project[]>([])
+const categories = ref<Category[]>([])
+const editing = ref<(ProjectForm & { id: number }) | null>(null)
+const newCategory = ref('')
+const form = ref<ProjectForm>(emptyForm())
+const mediaFiles = ref<MediaItem[]>([])
+const showMediaPicker = ref(false)
+const mediaTarget = ref<'create-cover' | 'edit-cover' | 'create-gallery' | 'edit-gallery' | 'create-logo' | 'edit-logo'>('create-cover')
+const mediaIndex = ref(0)
+const iconPickerOpen = ref(false)
+const iconTarget = ref<'create' | 'edit'>('create')
+const iconIndex = ref(0)
 
 function skillsText(project: Project): string {
     if (Array.isArray(project.skills)) return project.skills.join(', ')
@@ -71,6 +100,28 @@ function skillsText(project: Project): string {
         }
     }
     return ''
+}
+
+function asGallery(value: unknown): GalleryItem[] {
+    if (!Array.isArray(value)) return []
+    return value.map((row) => {
+        if (typeof row === 'string') return { src: row, alt: '' }
+        const item = (row && typeof row === 'object') ? row as Record<string, unknown> : {}
+        return { src: String(item.src ?? item.url ?? ''), alt: String(item.alt ?? '') }
+    }).filter((row) => row.src)
+}
+
+function asLogos(value: unknown): LogoItem[] {
+    if (!Array.isArray(value)) return []
+    return value.map((row) => {
+        const item = (row && typeof row === 'object') ? row as Record<string, unknown> : {}
+        return {
+            label: String(item.label ?? ''),
+            icon: String(item.icon ?? ''),
+            image: String(item.image ?? ''),
+            url: String(item.url ?? ''),
+        }
+    }).filter((row) => row.label || row.icon || row.image)
 }
 
 function mediaUrl(item: MediaItem): string {
@@ -95,20 +146,56 @@ async function loadMedia(): Promise<void> {
     mediaFiles.value = result.data
 }
 
-async function openCoverPicker(target: 'create' | 'edit'): Promise<void> {
+async function openMedia(target: typeof mediaTarget.value, index = 0): Promise<void> {
     mediaTarget.value = target
+    mediaIndex.value = index
     showMediaPicker.value = true
     if (!mediaFiles.value.length) await loadMedia()
 }
 
-function pickCover(item: MediaItem): void {
+function pickMedia(item: MediaItem): void {
     const url = mediaUrl(item)
-    if (mediaTarget.value === 'edit' && editing.value) {
-        editing.value.cover_image = url
-    } else {
-        form.value.cover_image = url
+    const target = mediaTarget.value
+    if (target === 'create-cover') form.value.cover_image = url
+    else if (target === 'edit-cover' && editing.value) editing.value.cover_image = url
+    else if (target === 'create-gallery') {
+        const next = [...form.value.gallery]
+        if (next[mediaIndex.value]) next[mediaIndex.value] = { ...next[mediaIndex.value], src: url }
+        else next.push({ src: url, alt: item.alt_text || item.original_name || '' })
+        form.value.gallery = next
+    } else if (target === 'edit-gallery' && editing.value) {
+        const next = [...editing.value.gallery]
+        if (next[mediaIndex.value]) next[mediaIndex.value] = { ...next[mediaIndex.value], src: url }
+        else next.push({ src: url, alt: item.alt_text || item.original_name || '' })
+        editing.value.gallery = next
+    } else if (target === 'create-logo') {
+        const next = [...form.value.logos]
+        if (next[mediaIndex.value]) next[mediaIndex.value] = { ...next[mediaIndex.value], image: url, icon: '' }
+        form.value.logos = next
+    } else if (target === 'edit-logo' && editing.value) {
+        const next = [...editing.value.logos]
+        if (next[mediaIndex.value]) next[mediaIndex.value] = { ...next[mediaIndex.value], image: url, icon: '' }
+        editing.value.logos = next
     }
     showMediaPicker.value = false
+}
+
+function openIconPicker(target: 'create' | 'edit', index: number): void {
+    iconTarget.value = target
+    iconIndex.value = index
+    iconPickerOpen.value = true
+}
+
+function onIconPicked(slug: string): void {
+    if (iconTarget.value === 'create') {
+        const next = [...form.value.logos]
+        if (next[iconIndex.value]) next[iconIndex.value] = { ...next[iconIndex.value], icon: slug, image: '' }
+        form.value.logos = next
+    } else if (editing.value) {
+        const next = [...editing.value.logos]
+        if (next[iconIndex.value]) next[iconIndex.value] = { ...next[iconIndex.value], icon: slug, image: '' }
+        editing.value.logos = next
+    }
 }
 
 async function createCategory(): Promise<void> {
@@ -122,36 +209,31 @@ async function createCategory(): Promise<void> {
     toast.success('Category created')
 }
 
+function payloadFrom(formValue: ProjectForm) {
+    return {
+        title: formValue.title,
+        summary: formValue.summary,
+        case_study: formValue.case_study || null,
+        status: formValue.status,
+        visibility: formValue.visibility,
+        is_featured: formValue.is_featured,
+        url: formValue.url || null,
+        cover_image: formValue.cover_image || null,
+        category_id: formValue.category_id,
+        skills: formValue.skills.split(',').map((s) => s.trim()).filter(Boolean),
+        gallery: formValue.gallery.filter((row) => row.src.trim()),
+        logos: formValue.logos.filter((row) => row.label.trim() || row.icon || row.image),
+    }
+}
+
 async function create(): Promise<void> {
     if (!form.value.title.trim()) return
     try {
         await props.api('/portfolio/projects', {
             method: 'POST',
-            body: JSON.stringify({
-                title: form.value.title,
-                summary: form.value.summary,
-                case_study: form.value.case_study || null,
-                status: form.value.status,
-                visibility: form.value.visibility,
-                is_featured: form.value.is_featured,
-                url: form.value.url || null,
-                cover_image: form.value.cover_image || null,
-                category_id: form.value.category_id,
-                skills: form.value.skills.split(',').map((s) => s.trim()).filter(Boolean),
-            }),
+            body: JSON.stringify(payloadFrom(form.value)),
         })
-        form.value = {
-            title: '',
-            summary: '',
-            case_study: '',
-            status: 'published',
-            visibility: 'public',
-            is_featured: true,
-            url: '',
-            cover_image: '',
-            skills: '',
-            category_id: null,
-        }
+        form.value = emptyForm()
         await load()
         toast.success('Project created')
     } catch (error) {
@@ -161,32 +243,28 @@ async function create(): Promise<void> {
 
 function startEdit(project: Project): void {
     editing.value = {
-        ...project,
-        skills: skillsText(project),
+        id: project.id,
+        title: project.title,
+        summary: project.summary || '',
+        case_study: project.case_study || '',
+        status: project.status,
+        visibility: project.visibility,
+        is_featured: !!project.is_featured,
+        url: project.url || '',
         cover_image: project.cover_image || '',
+        skills: skillsText(project),
+        category_id: project.category_id ?? null,
+        gallery: asGallery(project.gallery),
+        logos: asLogos(project.logos),
     }
 }
 
 async function saveEdit(): Promise<void> {
     if (!editing.value) return
-    const skills = typeof editing.value.skills === 'string'
-        ? editing.value.skills.split(',').map((s) => s.trim()).filter(Boolean)
-        : (editing.value.skills ?? [])
     try {
         await props.api(`/portfolio/projects/${editing.value.id}`, {
             method: 'PUT',
-            body: JSON.stringify({
-                title: editing.value.title,
-                summary: editing.value.summary,
-                case_study: editing.value.case_study,
-                url: editing.value.url || null,
-                cover_image: editing.value.cover_image || null,
-                category_id: editing.value.category_id,
-                status: editing.value.status,
-                visibility: editing.value.visibility,
-                is_featured: !!editing.value.is_featured,
-                skills,
-            }),
+            body: JSON.stringify(payloadFrom(editing.value)),
         })
         editing.value = null
         await load()
@@ -227,7 +305,9 @@ onMounted(load)
     <section class="space-y-4">
         <div>
             <h1 class="text-3xl font-semibold tracking-tight">Portfolio</h1>
-            <p class="text-muted-foreground text-sm">Projects on /projects and featured “Selected work” grids. Add a cover image for thumbnails.</p>
+            <p class="text-muted-foreground text-sm">
+                Cover thumbnails for Selected work, plus gallery and logos/icons on each project page.
+            </p>
         </div>
 
         <Card class="max-w-2xl">
@@ -254,6 +334,7 @@ onMounted(load)
                 <div class="space-y-2"><Label>Title</Label><Input v-model="form.title" /></div>
                 <div class="space-y-2"><Label>Summary</Label><Textarea v-model="form.summary" rows="2" /></div>
                 <div class="space-y-2"><Label>Case study</Label><Textarea v-model="form.case_study" rows="3" /></div>
+
                 <div class="space-y-2">
                     <Label>Cover / thumbnail</Label>
                     <div v-if="form.cover_image" class="overflow-hidden rounded-lg border">
@@ -261,21 +342,77 @@ onMounted(load)
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <Input v-model="form.cover_image" placeholder="/storage/… or https://" class="min-w-[12rem] flex-1" />
-                        <Button type="button" variant="outline" class="gap-1" @click="openCoverPicker('create')">
+                        <Button type="button" variant="outline" class="gap-1" @click="openMedia('create-cover')">
                             <ImageIcon class="size-3.5" />
                             Library
                         </Button>
                     </div>
                 </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <Label>Gallery (project page)</Label>
+                        <Button size="sm" variant="outline" class="gap-1" @click="form.gallery = [...form.gallery, { src: '', alt: '' }]; openMedia('create-gallery', form.gallery.length - 1)">
+                            <Plus class="size-3.5" />
+                            Add image
+                        </Button>
+                    </div>
+                    <div v-for="(item, index) in form.gallery" :key="`g-${index}`" class="space-y-2 rounded-lg border p-3">
+                        <div class="flex justify-end">
+                            <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="form.gallery = form.gallery.filter((_, i) => i !== index)">
+                                <Trash2 class="size-3.5" />
+                            </Button>
+                        </div>
+                        <div v-if="item.src" class="overflow-hidden rounded border">
+                            <img :src="item.src" :alt="item.alt" class="h-28 w-full object-cover">
+                        </div>
+                        <Button size="sm" variant="outline" class="w-full gap-1" @click="openMedia('create-gallery', index)">
+                            <ImageIcon class="size-3.5" />
+                            {{ item.src ? 'Replace image' : 'Choose image' }}
+                        </Button>
+                        <Input v-model="item.alt" placeholder="Caption / alt text" />
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <Label>Logos & icons</Label>
+                        <Button size="sm" variant="outline" class="gap-1" @click="form.logos = [...form.logos, { label: '', icon: '', image: '', url: '' }]">
+                            <Plus class="size-3.5" />
+                            Add
+                        </Button>
+                    </div>
+                    <p class="text-muted-foreground text-xs">Brand icons (Simple Icons) or custom logo images for tools/clients used on this project.</p>
+                    <div v-for="(item, index) in form.logos" :key="`l-${index}`" class="space-y-2 rounded-lg border p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" class="gap-1" @click="openIconPicker('create', index)">
+                                    <SocialBrandIcon v-if="item.icon" :slug="item.icon" :size="14" />
+                                    {{ item.icon || 'Pick icon' }}
+                                </Button>
+                                <Button size="sm" variant="outline" class="gap-1" @click="openMedia('create-logo', index)">
+                                    <ImageIcon class="size-3.5" />
+                                    Logo image
+                                </Button>
+                            </div>
+                            <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="form.logos = form.logos.filter((_, i) => i !== index)">
+                                <Trash2 class="size-3.5" />
+                            </Button>
+                        </div>
+                        <div v-if="item.image" class="bg-muted/40 flex h-12 items-center justify-center rounded border p-2">
+                            <img :src="item.image" alt="" class="max-h-full object-contain">
+                        </div>
+                        <Input v-model="item.label" placeholder="Label (React, Acme Corp…)" />
+                        <Input v-model="item.url" placeholder="Optional link https://" />
+                    </div>
+                </div>
+
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-2"><Label>URL</Label><Input v-model="form.url" placeholder="https://" /></div>
                     <div class="space-y-2"><Label>Skills (comma-separated)</Label><Input v-model="form.skills" placeholder="Laravel, Vue" /></div>
                     <div class="space-y-2 sm:col-span-2">
                         <Label>Category</Label>
-                        <select
-                            v-model="form.category_id"
-                            class="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
-                        >
+                        <select v-model="form.category_id" class="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm">
                             <option :value="null">None</option>
                             <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                         </select>
@@ -297,6 +434,7 @@ onMounted(load)
                 <div class="space-y-2"><Label>Title</Label><Input v-model="editing.title" /></div>
                 <div class="space-y-2"><Label>Summary</Label><Textarea v-model="editing.summary" rows="2" /></div>
                 <div class="space-y-2"><Label>Case study</Label><Textarea v-model="editing.case_study" rows="4" /></div>
+
                 <div class="space-y-2">
                     <Label>Cover / thumbnail</Label>
                     <div v-if="editing.cover_image" class="overflow-hidden rounded-lg border">
@@ -304,28 +442,77 @@ onMounted(load)
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <Input v-model="editing.cover_image" placeholder="/storage/… or https://" class="min-w-[12rem] flex-1" />
-                        <Button type="button" variant="outline" class="gap-1" @click="openCoverPicker('edit')">
+                        <Button type="button" variant="outline" class="gap-1" @click="openMedia('edit-cover')">
                             <ImageIcon class="size-3.5" />
                             Library
                         </Button>
                     </div>
                 </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <Label>Gallery (project page)</Label>
+                        <Button size="sm" variant="outline" class="gap-1" @click="editing.gallery = [...editing.gallery, { src: '', alt: '' }]; openMedia('edit-gallery', editing.gallery.length - 1)">
+                            <Plus class="size-3.5" />
+                            Add image
+                        </Button>
+                    </div>
+                    <div v-for="(item, index) in editing.gallery" :key="`eg-${index}`" class="space-y-2 rounded-lg border p-3">
+                        <div class="flex justify-end">
+                            <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="editing.gallery = editing.gallery.filter((_, i) => i !== index)">
+                                <Trash2 class="size-3.5" />
+                            </Button>
+                        </div>
+                        <div v-if="item.src" class="overflow-hidden rounded border">
+                            <img :src="item.src" :alt="item.alt" class="h-28 w-full object-cover">
+                        </div>
+                        <Button size="sm" variant="outline" class="w-full gap-1" @click="openMedia('edit-gallery', index)">
+                            <ImageIcon class="size-3.5" />
+                            {{ item.src ? 'Replace image' : 'Choose image' }}
+                        </Button>
+                        <Input v-model="item.alt" placeholder="Caption / alt text" />
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <Label>Logos & icons</Label>
+                        <Button size="sm" variant="outline" class="gap-1" @click="editing.logos = [...editing.logos, { label: '', icon: '', image: '', url: '' }]">
+                            <Plus class="size-3.5" />
+                            Add
+                        </Button>
+                    </div>
+                    <div v-for="(item, index) in editing.logos" :key="`el-${index}`" class="space-y-2 rounded-lg border p-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex flex-wrap gap-2">
+                                <Button size="sm" variant="outline" class="gap-1" @click="openIconPicker('edit', index)">
+                                    <SocialBrandIcon v-if="item.icon" :slug="item.icon" :size="14" />
+                                    {{ item.icon || 'Pick icon' }}
+                                </Button>
+                                <Button size="sm" variant="outline" class="gap-1" @click="openMedia('edit-logo', index)">
+                                    <ImageIcon class="size-3.5" />
+                                    Logo image
+                                </Button>
+                            </div>
+                            <Button size="sm" variant="ghost" class="text-destructive h-7 px-2" @click="editing.logos = editing.logos.filter((_, i) => i !== index)">
+                                <Trash2 class="size-3.5" />
+                            </Button>
+                        </div>
+                        <div v-if="item.image" class="bg-muted/40 flex h-12 items-center justify-center rounded border p-2">
+                            <img :src="item.image" alt="" class="max-h-full object-contain">
+                        </div>
+                        <Input v-model="item.label" placeholder="Label" />
+                        <Input v-model="item.url" placeholder="Optional link https://" />
+                    </div>
+                </div>
+
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div class="space-y-2"><Label>URL</Label><Input v-model="editing.url" /></div>
-                    <div class="space-y-2">
-                        <Label>Skills</Label>
-                        <Input
-                            :model-value="typeof editing.skills === 'string' ? editing.skills : skillsText(editing)"
-                            @update:model-value="editing.skills = String($event)"
-                        />
-                    </div>
+                    <div class="space-y-2"><Label>Skills</Label><Input v-model="editing.skills" /></div>
                 </div>
                 <div class="space-y-2">
                     <Label>Category</Label>
-                    <select
-                        v-model="editing.category_id"
-                        class="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm"
-                    >
+                    <select v-model="editing.category_id" class="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm">
                         <option :value="null">None</option>
                         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
                     </select>
@@ -343,6 +530,7 @@ onMounted(load)
                     <TableRow>
                         <TableHead class="w-16" />
                         <TableHead>Title</TableHead>
+                        <TableHead>Media</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Featured</TableHead>
                         <TableHead />
@@ -350,22 +538,20 @@ onMounted(load)
                 </TableHeader>
                 <TableBody>
                     <TableRow v-if="projects.length === 0">
-                        <TableCell colspan="5" class="text-muted-foreground py-8 text-center">No projects yet.</TableCell>
+                        <TableCell colspan="6" class="text-muted-foreground py-8 text-center">No projects yet.</TableCell>
                     </TableRow>
                     <TableRow v-for="project in projects" :key="project.id">
                         <TableCell>
                             <div class="bg-muted size-12 overflow-hidden rounded-md border">
-                                <img
-                                    v-if="project.cover_image"
-                                    :src="project.cover_image"
-                                    alt=""
-                                    class="size-full object-cover"
-                                >
+                                <img v-if="project.cover_image" :src="project.cover_image" alt="" class="size-full object-cover">
                             </div>
                         </TableCell>
                         <TableCell>
                             <p class="font-medium">{{ project.title }}</p>
                             <p class="text-muted-foreground text-xs">/projects/{{ project.slug }}</p>
+                        </TableCell>
+                        <TableCell class="text-muted-foreground text-xs">
+                            {{ asGallery(project.gallery).length }} gallery · {{ asLogos(project.logos).length }} logos
                         </TableCell>
                         <TableCell><Badge>{{ project.status }} / {{ project.visibility }}</Badge></TableCell>
                         <TableCell>{{ project.is_featured ? 'Yes' : 'No' }}</TableCell>
@@ -398,7 +584,7 @@ onMounted(load)
         >
             <div class="bg-background max-h-[85vh] w-full max-w-4xl overflow-auto rounded-xl border p-4 shadow-xl">
                 <div class="mb-3 flex items-center justify-between gap-2">
-                    <strong>Choose cover image</strong>
+                    <strong>Choose media</strong>
                     <Button size="sm" variant="ghost" @click="showMediaPicker = false">
                         <X class="size-4" />
                     </Button>
@@ -409,9 +595,16 @@ onMounted(load)
                     :api="api"
                     selectable
                     @refreshed="mediaFiles = $event"
-                    @select="pickCover"
+                    @select="pickMedia"
                 />
             </div>
         </div>
+
+        <IconPicker
+            v-model:open="iconPickerOpen"
+            :model-value="(iconTarget === 'edit' ? editing?.logos[iconIndex]?.icon : form.logos[iconIndex]?.icon) || null"
+            title="Project logo icon"
+            @update:model-value="onIconPicked"
+        />
     </section>
 </template>

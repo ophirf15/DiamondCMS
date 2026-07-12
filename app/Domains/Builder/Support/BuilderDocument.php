@@ -291,7 +291,7 @@ final class BuilderDocument
     /** @param array<string, mixed> $props */
     private static function resumeDownload(array $props): string
     {
-        $label = e((string) Arr::get($props, 'text', 'Download PDF'));
+        $label = e((string) Arr::get($props, 'text', 'Download resume'));
         $variant = \Illuminate\Support\Facades\DB::table('resume_variants')
             ->where('visibility', 'public')
             ->orderByDesc('updated_at')
@@ -301,7 +301,27 @@ final class BuilderDocument
             return '<p class="dc-text">Publish a public résumé variant in admin to enable downloads.</p>';
         }
 
-        return '<a class="dc-button" href="'.e(route('resume.print', $variant->slug)).'">'.$label.'</a>';
+        $hasPdf = filled($variant->download_pdf ?? null);
+        $hasDocx = filled($variant->download_docx ?? null);
+        if (! $hasPdf && ! $hasDocx) {
+            return '<p class="dc-text">Attach a PDF or DOCX on the résumé variant to enable downloads.</p>';
+        }
+
+        $options = '';
+        if ($hasPdf) {
+            $options .= '<a class="dc-resume-download-option" href="'.e(route('resume.download', ['slug' => $variant->slug, 'format' => 'pdf'])).'">PDF</a>';
+        }
+        if ($hasDocx) {
+            $options .= '<a class="dc-resume-download-option" href="'.e(route('resume.download', ['slug' => $variant->slug, 'format' => 'docx'])).'">DOCX</a>';
+        }
+
+        return '<div class="dc-resume-download" data-dc-resume-download>'
+            .'<button type="button" class="dc-button dc-resume-download-trigger" data-dc-resume-download-trigger aria-expanded="false" aria-haspopup="true">'
+            .$label
+            .'<span class="dc-resume-download-chevron" aria-hidden="true">▾</span>'
+            .'</button>'
+            .'<div class="dc-resume-download-menu" data-dc-resume-download-menu hidden>'.$options.'</div>'
+            .'</div>';
     }
 
     private static function resumeExperience(): string
@@ -319,9 +339,15 @@ final class BuilderDocument
         $html = $items->map(function (object $item): string {
             $title = e((string) ($item->title ?? 'Role'));
             $org = e((string) ($item->organization ?? ''));
-            $body = e((string) ($item->body ?? $item->description ?? ''));
+            $bullets = json_decode((string) ($item->bullets ?? '[]'), true) ?: [];
+            if (! is_array($bullets) || $bullets === []) {
+                $body = e((string) ($item->body ?? ''));
+                $list = $body !== '' ? '<p>'.$body.'</p>' : '';
+            } else {
+                $list = '<ul>'.collect($bullets)->map(fn ($b) => '<li>'.e((string) $b).'</li>')->implode('').'</ul>';
+            }
 
-            return '<article class="dc-resume-item"><h3>'.$title.($org !== '' ? ' · '.$org : '').'</h3><p>'.$body.'</p></article>';
+            return '<article class="dc-resume-item"><h3>'.$title.($org !== '' ? ' · '.$org : '').'</h3>'.$list.'</article>';
         })->implode('');
 
         return '<div class="dc-resume-experience">'.$html.'</div>';

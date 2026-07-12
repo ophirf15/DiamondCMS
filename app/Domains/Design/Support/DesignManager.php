@@ -72,6 +72,24 @@ final class DesignManager
                 'controlStyle' => 'soft',
                 'socialStyle' => 'icons-labels',
             ],
+            'portfolio' => [
+                'pageLayout' => 'classic',
+                'logoStyle' => 'chips',
+                'logoSize' => 'lg',
+                'logoPlacement' => 'beside-title',
+                'ctaSize' => 'md',
+                'skillsStyle' => 'chips',
+                'galleryPosition' => 'after',
+                'galleryDisplay' => 'carousel',
+                'galleryFit' => 'contain',
+                'indexLayout' => 'grid',
+                'cardFit' => 'contain',
+            ],
+            'resume' => [
+                'density' => 'comfortable',
+                'sectionRhythm' => 'relaxed',
+                'experienceStyle' => 'stacked',
+            ],
             'themeControl' => [
                 'allowVisitorToggle' => true,
                 'lockMode' => false,
@@ -151,6 +169,100 @@ final class DesignManager
             'icons-labels' => ['label' => 'Icons + labels', 'description' => 'Icon beside name'],
             'pills' => ['label' => 'Pills', 'description' => 'Soft rounded chips'],
         ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioPageLayouts(): array
+    {
+        return [
+            'classic' => ['label' => 'Classic stack', 'description' => 'Hero, title, logos, skills, CTA, story'],
+            'split' => ['label' => 'Split media', 'description' => 'Media column beside story'],
+            'magazine' => ['label' => 'Magazine', 'description' => 'Bold hero, icon strip, compact meta'],
+            'compact' => ['label' => 'Compact', 'description' => 'Dense header band, quick scan'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioLogoStyles(): array
+    {
+        return [
+            'chips' => ['label' => 'Chips', 'description' => 'Icon + label in soft pills'],
+            'icons' => ['label' => 'Icons only', 'description' => 'Larger marks, labels for screen readers'],
+            'badges' => ['label' => 'Badges', 'description' => 'Outlined tiles with label under'],
+            'plain' => ['label' => 'Plain row', 'description' => 'Text-forward with small marks'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioLogoPlacements(): array
+    {
+        return [
+            'beside-title' => ['label' => 'Beside title', 'description' => 'Matches title height; wide logos stay readable'],
+            'below' => ['label' => 'Below summary', 'description' => 'Classic stacked chips under the intro'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioSizePresets(): array
+    {
+        return [
+            'sm' => ['label' => 'Small', 'description' => '~72% of title height'],
+            'md' => ['label' => 'Medium', 'description' => '~90% of title height'],
+            'lg' => ['label' => 'Large', 'description' => 'Full title height'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioSkillsStyles(): array
+    {
+        return [
+            'chips' => ['label' => 'Chips', 'description' => 'One skill per pill'],
+            'inline' => ['label' => 'Inline text', 'description' => 'Comma-separated line'],
+            'hidden' => ['label' => 'Hidden', 'description' => 'Do not show skills row'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioIndexLayouts(): array
+    {
+        return [
+            'grid' => ['label' => 'Card grid', 'description' => 'Thumbnail cards'],
+            'list' => ['label' => 'List', 'description' => 'Rows with small thumbs'],
+            'mosaic' => ['label' => 'Mosaic', 'description' => 'Varied image-forward tiles'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioGalleryDisplays(): array
+    {
+        return [
+            'carousel' => ['label' => 'Carousel', 'description' => 'One slide at a time with controls'],
+            'grid' => ['label' => 'Grid', 'description' => 'All images in a fixed frame grid'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function portfolioMediaFits(): array
+    {
+        return [
+            'contain' => ['label' => 'Fit (no crop)', 'description' => 'Fixed frame; never stretch small images'],
+            'cover' => ['label' => 'Fill (crop)', 'description' => 'Fill the frame; may crop edges'],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function portfolio(): array
+    {
+        $portfolio = self::tokens()['portfolio'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['portfolio'], is_array($portfolio) ? $portfolio : []);
+    }
+
+    public static function portfolioAttr(string $key, array $allowed, string $fallback): string
+    {
+        $value = (string) (self::portfolio()[$key] ?? $fallback);
+
+        return array_key_exists($value, $allowed) ? $value : $fallback;
     }
 
     /** @return array<string, array{label: string, css: string, mode?: string, dark?: array<string, string>}> */
@@ -329,6 +441,23 @@ final class DesignManager
             .'--dc-uikit-control:'.$controlStyle.';'
             .'--dc-social-style:'.$socialStyle.';';
 
+        $portfolio = $tokens['portfolio'] ?? [];
+        $logoSize = (string) ($portfolio['logoSize'] ?? 'md');
+        $ctaSize = (string) ($portfolio['ctaSize'] ?? 'md');
+        $logoPx = match ($logoSize) {
+            'sm' => '0.72em',
+            'md' => '0.9em',
+            default => '1em',
+        };
+        $logoMaxW = match ($logoSize) {
+            'sm' => '4.5em',
+            'md' => '5.75em',
+            default => '7em',
+        };
+        $shared .= '--dc-project-logo-size:'.$logoPx.';'
+            .'--dc-project-logo-max-width:'.$logoMaxW.';'
+            .'--dc-project-cta-size:'.$ctaSize.';';
+
         $rootVars = match ($mode) {
             'dark' => $darkVars.$shared,
             'light' => $lightVars.$shared,
@@ -414,7 +543,52 @@ final class DesignManager
     /** @return array<string, mixed> */
     public static function uiKit(): array
     {
-        return self::tokens()['uiKit'] ?? [];
+        $uiKit = self::tokens()['uiKit'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['uiKit'], is_array($uiKit) ? $uiKit : []);
+    }
+
+    /** @return array<string, mixed> */
+    public static function resume(): array
+    {
+        $resume = self::tokens()['resume'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['resume'], is_array($resume) ? $resume : []);
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function resumeDensities(): array
+    {
+        return [
+            'comfortable' => ['label' => 'Comfortable', 'description' => 'Roomy resume padding'],
+            'compact' => ['label' => 'Compact', 'description' => 'Tighter print-friendly spacing'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function resumeSectionRhythms(): array
+    {
+        return [
+            'relaxed' => ['label' => 'Relaxed', 'description' => 'More space between sections'],
+            'tight' => ['label' => 'Tight', 'description' => 'Dense section stacking'],
+        ];
+    }
+
+    /** @return array<string, array{label: string, description: string}> */
+    public static function resumeExperienceStyles(): array
+    {
+        return [
+            'stacked' => ['label' => 'Stacked cards', 'description' => 'Experience roles as clear blocks'],
+            'compact-list' => ['label' => 'Compact list', 'description' => 'Dense experience rows only'],
+            'timeline' => ['label' => 'Timeline', 'description' => 'Experience only — left rule with markers'],
+        ];
+    }
+
+    public static function resumeAttr(string $key, array $allowed, string $fallback): string
+    {
+        $value = (string) (self::resume()[$key] ?? $fallback);
+
+        return array_key_exists($value, $allowed) ? $value : $fallback;
     }
 
     public static function socialStyle(): string

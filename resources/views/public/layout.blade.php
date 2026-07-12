@@ -34,6 +34,9 @@
     $defaultTheme = \App\Domains\Design\Support\DesignManager::resolvedDefaultTheme();
     $surface = \App\Domains\Design\Support\DesignManager::surfaceAttr();
     $uiKit = \App\Domains\Design\Support\DesignManager::uiKit();
+    $resumeDensity = \App\Domains\Design\Support\DesignManager::resumeAttr('density', \App\Domains\Design\Support\DesignManager::resumeDensities(), 'comfortable');
+    $resumeRhythm = \App\Domains\Design\Support\DesignManager::resumeAttr('sectionRhythm', \App\Domains\Design\Support\DesignManager::resumeSectionRhythms(), 'relaxed');
+    $resumeExperience = \App\Domains\Design\Support\DesignManager::resumeAttr('experienceStyle', \App\Domains\Design\Support\DesignManager::resumeExperienceStyles(), 'stacked');
 @endphp
 <body
     class="dc-site {{ $shell === 'sidebar-dark' ? 'dc-shell-sidebar-dark' : 'dc-shell-default' }} dc-header-{{ $headerStyle }} dc-footer-{{ $footerStyle }} dc-btn-{{ $buttonStyle }} dc-surface-{{ $surface }}"
@@ -42,6 +45,9 @@
     data-dc-surface="{{ $surface }}"
     data-dc-density="{{ $uiKit['density'] ?? 'comfortable' }}"
     data-dc-control="{{ $uiKit['controlStyle'] ?? 'soft' }}"
+    data-dc-resume-density="{{ $resumeDensity }}"
+    data-dc-resume-rhythm="{{ $resumeRhythm }}"
+    data-dc-resume-experience="{{ $resumeExperience }}"
     data-dc-theme-default="{{ $defaultTheme }}"
     data-dc-theme-lock="{{ $themeLocked ? '1' : '0' }}"
     data-dc-theme-toggle="{{ $visitorToggle ? '1' : '0' }}"

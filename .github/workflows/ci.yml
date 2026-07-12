@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
 
+env:
+  DB_CONNECTION: mysql
+  DB_HOST: 127.0.0.1
+  DB_PORT: 3306
+  DB_DATABASE: diamondcms
+  DB_USERNAME: diamondcms
+  DB_PASSWORD: diamondcms_local
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,7 +32,8 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@v5
-      - uses: shivammathur/setup-php@v3
+      # setup-php has no v3 tag — current major is v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: mbstring, openssl, pdo_mysql, gd, zip, intl, fileinfo
@@ -42,3 +51,31 @@ jobs:
       - run: vendor/bin/phpstan analyse --memory-limit=1G
       - run: php artisan test
       - run: npm run build
+
+  release-package:
+    name: Build installable ZIP
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, openssl, pdo_mysql, gd, zip, intl, fileinfo
+          coverage: none
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+      - name: Build release ZIP
+        run: php scripts/build-release.php
+      - name: Upload install package
+        uses: actions/upload-artifact@v4
+        with:
+          name: diamondcms-release
+          path: |
+            storage/app/releases/diamondcms-*.zip
+            storage/app/releases/diamondcms-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

@@ -48,6 +48,25 @@ class CatchupWaveATest extends TestCase
         $this->assertStringNotContainsString('prefers-color-scheme', $css);
     }
 
+    public function test_resume_and_uikit_attrs_are_emitted_on_public_layout(): void
+    {
+        DesignManager::saveTokens([
+            'uiKit' => ['density' => 'compact', 'controlStyle' => 'bordered'],
+            'resume' => [
+                'density' => 'compact',
+                'sectionRhythm' => 'tight',
+                'experienceStyle' => 'timeline',
+            ],
+        ]);
+
+        $html = $this->get('/projects')->assertOk()->getContent();
+        $this->assertStringContainsString('data-dc-density="compact"', $html);
+        $this->assertStringContainsString('data-dc-control="bordered"', $html);
+        $this->assertStringContainsString('data-dc-resume-density="compact"', $html);
+        $this->assertStringContainsString('data-dc-resume-rhythm="tight"', $html);
+        $this->assertStringContainsString('data-dc-resume-experience="timeline"', $html);
+    }
+
     public function test_starter_templates_are_differentiated(): void
     {
         $defs = StarterTemplates::definitions();

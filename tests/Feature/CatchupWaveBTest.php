@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domains\Builder\Support\BuilderDocument;
+use App\Domains\Design\Support\DesignManager;
 use App\Domains\Resume\Support\ResumeManager;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -97,6 +98,15 @@ class CatchupWaveBTest extends TestCase
             'is_featured' => true,
             'category_id' => $category['id'],
             'skills' => ['Vue', 'Laravel'],
+            'cover_image' => '/brand/logo-primary-gold.svg',
+            'gallery' => [
+                ['src' => '/brand/logo-gold-on-charcoal.svg', 'alt' => 'Dark mark'],
+                ['src' => '/brand/diamond-icon-gold.svg', 'alt' => 'Icon'],
+            ],
+            'logos' => [
+                ['label' => 'Vue', 'icon' => 'vuedotjs', 'image' => '', 'url' => 'https://vuejs.org'],
+                ['label' => 'Brand', 'icon' => '', 'image' => '/brand/favicon.svg', 'url' => ''],
+            ],
         ])->assertCreated()->json();
 
         $this->putJson('/admin/api/portfolio/projects/'.$project['id'], [
@@ -105,7 +115,34 @@ class CatchupWaveBTest extends TestCase
         ])->assertOk();
 
         $this->get('/projects')->assertOk()->assertSee('Case Study Alpha');
-        $this->get('/projects/'.$project['slug'])->assertOk()->assertSee('Updated case');
+        $show = $this->get('/projects/'.$project['slug'])->assertOk();
+        $show->assertSee('Updated case');
+        $show->assertSee('dc-project-gallery', false);
+        $show->assertSee('dc-gallery-carousel', false);
+        $show->assertSee('dc-media-frame', false);
+        $show->assertSee('dc-project-logos', false);
+        $show->assertSee('dc-project-cta', false);
+        $show->assertSee('dc-project-page--classic', false);
+        $show->assertSee('Dark mark');
+        $show->assertSee('Vue');
+        $show->assertSee('cdn.simpleicons.org/vuedotjs', false);
+
+        DesignManager::saveTokens([
+            'portfolio' => [
+                'pageLayout' => 'magazine',
+                'logoStyle' => 'icons',
+                'logoSize' => 'lg',
+                'ctaSize' => 'sm',
+                'skillsStyle' => 'chips',
+            ],
+        ]);
+
+        $magazine = $this->get('/projects/'.$project['slug'])->assertOk();
+        $magazine->assertSee('dc-project-page--magazine', false);
+        $magazine->assertSee('dc-project-logos--icons', false);
+        $magazine->assertSee('dc-project-logosize--lg', false);
+        $magazine->assertSee('dc-project-cta--sm', false);
+        $magazine->assertSee('dc-project-skill-chip', false);
 
         $this->deleteJson('/admin/api/portfolio/projects/'.$project['id'])->assertNoContent();
         $this->get('/projects/'.$project['slug'])->assertNotFound();
@@ -188,5 +225,11 @@ class CatchupWaveBTest extends TestCase
 
         $backup = $this->postJson('/admin/api/backups', ['type' => 'full'])->assertCreated()->json();
         $this->getJson('/admin/api/backups')->assertOk()->assertJsonFragment(['id' => $backup['id']]);
+
+        \Illuminate\Support\Facades\Storage::disk('public')->put('media/api-export.txt', 'via-api');
+        $export = $this->postJson('/admin/api/exports')->assertOk()->json();
+        $this->assertArrayHasKey('download_url', $export);
+        $this->assertArrayHasKey('media_files', $export);
+        $this->get($export['download_url'])->assertOk();
     }
 }
