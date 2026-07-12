@@ -24,8 +24,14 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 Route::get('/', function () {
-    if (! Schema::hasTable('pages')) {
-        return view('public.landing');
+    try {
+        if (! Schema::hasTable('pages')) {
+            return view('public.landing');
+        }
+    } catch (Throwable) {
+        return InstallState::isInstalled()
+            ? view('public.landing')
+            : redirect()->route('install.wizard');
     }
 
     $homepageSlug = diamondcms_setting('homepage_slug', 'home');
@@ -350,6 +356,7 @@ if (! function_exists('installer_requirements')) {
             'extensions' => collect(['pdo_mysql', 'mbstring', 'openssl', 'gd', 'zip', 'intl', 'fileinfo'])->mapWithKeys(fn (string $extension) => [$extension => extension_loaded($extension)])->all(),
             'writable' => [
                 'storage' => is_writable(storage_path()),
+                'views' => is_writable(storage_path('framework/views')),
                 'cache' => is_writable(base_path('bootstrap/cache')),
             ],
             'rewrite' => ['ok' => true, 'note' => 'Verified by reaching the installer route.'],

@@ -37,6 +37,8 @@ foreach ($iterator as $item) {
     copy($item->getPathname(), $target);
 }
 
+ensure_storage_scaffold($releaseDir);
+
 file_put_contents($releaseDir.'/release-manifest.json', json_encode([
     'product' => 'DiamondCMS',
     'version' => $version,
@@ -86,12 +88,10 @@ function config_excludes(string $root): array
         'node_modules',
         'tests',
         'DiamondCMS_Phased_Plan',
-        'storage/logs',
-        'storage/framework/cache',
-        'storage/framework/sessions',
-        'storage/framework/views',
-        'storage/app/public',
         'storage/app/releases',
+        'storage/app/private/backups',
+        'storage/app/private/exports',
+        'storage/app/private/imports',
         '.phpunit.result.cache',
         'phpunit.xml',
         'vite.config.js',
@@ -131,5 +131,33 @@ function remove_file(string $path): void
 {
     if (is_file($path)) {
         unlink($path);
+    }
+}
+
+/**
+ * Ensure writable Laravel storage dirs exist in the package (with .gitignore placeholders).
+ */
+function ensure_storage_scaffold(string $releaseDir): void
+{
+    $dirs = [
+        'storage/app/public',
+        'storage/app/private',
+        'storage/framework/cache/data',
+        'storage/framework/sessions',
+        'storage/framework/testing',
+        'storage/framework/views',
+        'storage/logs',
+        'bootstrap/cache',
+    ];
+
+    foreach ($dirs as $dir) {
+        $path = $releaseDir.'/'.$dir;
+        if (! is_dir($path)) {
+            mkdir($path, 0775, true);
+        }
+        $gitignore = $path.'/.gitignore';
+        if (! is_file($gitignore)) {
+            file_put_contents($gitignore, "*\n!.gitignore\n");
+        }
     }
 }

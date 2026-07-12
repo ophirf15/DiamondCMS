@@ -7,6 +7,20 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// Shared hosts / incomplete ZIPs may omit empty storage dirs Laravel requires at boot.
+foreach ([
+    'storage/framework/views',
+    'storage/framework/cache/data',
+    'storage/framework/sessions',
+    'storage/logs',
+    'bootstrap/cache',
+] as $relative) {
+    $path = __DIR__.'/../'.$relative;
+    if (! is_dir($path)) {
+        @mkdir($path, 0775, true);
+    }
+}
+
 // Determine if the application is in maintenance mode...
 if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
     require $maintenance;

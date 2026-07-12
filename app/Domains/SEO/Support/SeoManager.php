@@ -33,12 +33,16 @@ final class SeoManager
 
     public function redirectFor(string $path): ?object
     {
-        $source = '/'.ltrim($path, '/');
-        $redirect = DB::table('redirects')->where('source', $source)->where('is_active', true)->first();
-        if ($redirect && ! Str::startsWith($redirect->target, $source)) {
-            DB::table('redirects')->where('id', $redirect->id)->increment('hit_count', 1, ['last_hit_at' => now()]);
+        try {
+            $source = '/'.ltrim($path, '/');
+            $redirect = DB::table('redirects')->where('source', $source)->where('is_active', true)->first();
+            if ($redirect && ! Str::startsWith($redirect->target, $source)) {
+                DB::table('redirects')->where('id', $redirect->id)->increment('hit_count', 1, ['last_hit_at' => now()]);
 
-            return $redirect;
+                return $redirect;
+            }
+        } catch (\Throwable) {
+            return null;
         }
 
         return null;
