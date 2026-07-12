@@ -2,7 +2,20 @@
 
 DiamondCMS updates are GitHub Releases of the **production ZIP** from `php scripts/build-release.php`.
 
-## Maintainers (local)
+## Maintainers (local / CI)
+
+Preferred (automatic):
+
+```bash
+# bump VERSION + CHANGELOG, commit, then:
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+GitHub Actions (`.github/workflows/release.yml`) builds the production ZIP and publishes a
+Release with `diamondcms-*.zip` + `.sha256` attached. The in-app updater reads that Release.
+
+Manual fallback:
 
 1. Bump `VERSION` and `CHANGELOG.md`.
 2. Commit and push.
