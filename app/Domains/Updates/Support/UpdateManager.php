@@ -41,19 +41,33 @@ final class UpdateManager
      */
     public function checkLatest(): array
     {
-        $repo = (string) config('diamondcms.updates.github_repo', 'ophiryahalom/DiamondCMS');
+        $repo = (string) config('diamondcms.updates.github_repo', 'ophirf15/DiamondCMS');
         $api = 'https://api.github.com/repos/'.$repo.'/releases/latest';
-        $headers = ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'DiamondCMS-Updater'];
-        $token = config('diamondcms.updates.github_token');
-        if (is_string($token) && $token !== '') {
-            $headers['Authorization'] = 'Bearer '.$token;
+        $headers = $this->githubHeaders();
+
+        $response = Http::timeout(20)->withHeaders($headers)->get($api);
+        if ($response->status() === 404) {
+            $hint = is_string(config('diamondcms.updates.github_token')) && config('diamondcms.updates.github_token') !== ''
+                ? 'Confirm DIAMONDCMS_GITHUB_REPO is correct and that a published Release exists (push a v* tag to trigger release.yml).'
+                : 'Private repos need DIAMONDCMS_GITHUB_TOKEN. Also confirm DIAMONDCMS_GITHUB_REPO and that a published Release exists (push a v* tag).';
+
+            throw new RuntimeException("No GitHub release found for {$repo}. {$hint}");
+        }
+        if (! $response->successful()) {
+            throw new RuntimeException('GitHub release check failed (HTTP '.$response->status().').');
         }
 
-        $release = Http::timeout(20)->withHeaders($headers)->get($api)->throw()->json();
+        $release = $response->json();
+        if (! is_array($release)) {
+            throw new RuntimeException('GitHub returned an unexpected release payload.');
+        }
+
         $latest = ltrim((string) ($release['tag_name'] ?? ''), 'v');
         $assets = collect($release['assets'] ?? [])->map(fn (array $asset) => [
             'name' => (string) ($asset['name'] ?? ''),
-            'url' => (string) ($asset['browser_download_url'] ?? ''),
+            // Prefer API asset URL so private-repo downloads work with the token.
+            'url' => (string) ($asset['url'] ?? $asset['browser_download_url'] ?? ''),
+            'browser_url' => (string) ($asset['browser_download_url'] ?? ''),
             'size' => (int) ($asset['size'] ?? 0),
         ])->filter(fn (array $asset) => $asset['name'] !== '' && $asset['url'] !== '')->values();
 
@@ -71,11 +85,32 @@ final class UpdateManager
             'newer' => $latest !== '' && version_compare($latest, $current, '>'),
             'notes' => (string) ($release['body'] ?? ''),
             'html_url' => $release['html_url'] ?? null,
-            'assets' => $assets->all(),
+            'assets' => $assets->map(fn (array $asset) => [
+                'name' => $asset['name'],
+                'url' => $asset['browser_url'] !== '' ? $asset['browser_url'] : $asset['url'],
+                'size' => $asset['size'],
+            ])->all(),
             'zip_url' => is_array($zip) ? $zip['url'] : null,
             'zip_name' => is_array($zip) ? $zip['name'] : null,
             'checksum_url' => is_array($checksum) ? $checksum['url'] : null,
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function githubHeaders(bool $forAssetDownload = false): array
+    {
+        $headers = [
+            'Accept' => $forAssetDownload ? 'application/octet-stream' : 'application/vnd.github+json',
+            'User-Agent' => 'DiamondCMS-Updater',
+        ];
+        $token = config('diamondcms.updates.github_token');
+        if (is_string($token) && $token !== '') {
+            $headers['Authorization'] = 'Bearer '.$token;
+        }
+
+        return $headers;
     }
 
     /**
@@ -94,14 +129,20 @@ final class UpdateManager
         }
 
         $version = (string) $latest['latest'];
-        $zipResponse = Http::timeout(120)->withHeaders(['User-Agent' => 'DiamondCMS-Updater'])->get($latest['zip_url']);
+        $zipResponse = Http::timeout(120)
+            ->withHeaders($this->githubHeaders(forAssetDownload: true))
+            ->withOptions(['allow_redirects' => true])
+            ->get($latest['zip_url']);
         if (! $zipResponse->successful()) {
-            throw new RuntimeException('Unable to download release ZIP from GitHub.');
+            throw new RuntimeException('Unable to download release ZIP from GitHub (HTTP '.$zipResponse->status().').');
         }
 
         $expected = null;
         if (is_string($latest['checksum_url'] ?? null) && $latest['checksum_url'] !== '') {
-            $sumBody = Http::timeout(30)->withHeaders(['User-Agent' => 'DiamondCMS-Updater'])->get($latest['checksum_url'])->body();
+            $sumBody = Http::timeout(30)
+                ->withHeaders($this->githubHeaders(forAssetDownload: true))
+                ->get($latest['checksum_url'])
+                ->body();
             if (preg_match('/\b([a-f0-9]{64})\b/i', $sumBody, $match)) {
                 $expected = strtolower($match[1]);
             }

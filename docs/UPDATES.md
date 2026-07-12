@@ -2,18 +2,22 @@
 
 DiamondCMS updates are GitHub Releases of the **production ZIP** from `php scripts/build-release.php`.
 
+Repo: `ophirf15/DiamondCMS` (set `DIAMONDCMS_GITHUB_REPO` if different).
+
 ## Maintainers (local / CI)
 
-Preferred (automatic):
+A normal push to `master` runs **CI only**. It does **not** create a GitHub Release.
+
+Preferred (automatic Release):
 
 ```bash
-# bump VERSION + CHANGELOG, commit, then:
+# bump VERSION + CHANGELOG, commit + push to master, then:
 git tag v0.1.1
 git push origin v0.1.1
 ```
 
-GitHub Actions (`.github/workflows/release.yml`) builds the production ZIP and publishes a
-Release with `diamondcms-*.zip` + `.sha256` attached. The in-app updater reads that Release.
+That triggers `.github/workflows/release.yml`, which builds the production ZIP and publishes a
+Release with `diamondcms-*.zip` + `.sha256` attached. The in-app updater reads **Releases**, not tags alone.
 
 Manual fallback:
 
@@ -27,7 +31,16 @@ Manual fallback:
 
 ## Production (Admin → System)
 
-1. **Check GitHub** — compares running `VERSION` to the latest release.
+On Bluehost `.env`:
+
+```env
+DIAMONDCMS_GITHUB_REPO=ophirf15/DiamondCMS
+DIAMONDCMS_GITHUB_TOKEN=ghp_...   # required while the repo is private
+```
+
+Token needs at least read access to repository contents / releases.
+
+1. **Check GitHub** — compares running `VERSION` to the latest **published** Release.
 2. **Download & stage** — pulls the ZIP, verifies SHA-256 when a `.sha256` asset exists.
 3. **Apply** — maintenance mode, DB backup, copies code over the app, runs migrations, health check.
 

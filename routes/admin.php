@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 Route::middleware(['auth', 'admin'])->group(function (): void {
     Route::get('/', fn () => redirect()->route('admin.dashboard'));
@@ -1108,10 +1109,18 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             DB::table('update_logs')->orderByDesc('id')->limit(20)->get(['id', 'version', 'status', 'checksum', 'source_url', 'created_at', 'notes'])
         ));
         Route::get('/updates/check', function (UpdateManager $updates) {
-            return response()->json($updates->checkLatest());
+            try {
+                return response()->json($updates->checkLatest());
+            } catch (RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
         });
         Route::post('/updates/download', function (Request $request, UpdateManager $updates) {
-            return response()->json($updates->downloadLatest($request->user()->id), 201);
+            try {
+                return response()->json($updates->downloadLatest($request->user()->id), 201);
+            } catch (RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
         });
         Route::post('/updates/upload', function (Request $request, UpdateManager $updates) {
             $data = $request->validate([

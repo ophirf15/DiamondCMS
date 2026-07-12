@@ -11,7 +11,7 @@ return [
     'scheduler_token' => env('DIAMONDCMS_SCHEDULER_TOKEN'),
     'recovery_key' => env('DIAMONDCMS_RECOVERY_KEY'),
     'updates' => [
-        'github_repo' => env('DIAMONDCMS_GITHUB_REPO', 'ophiryahalom/DiamondCMS'),
+        'github_repo' => env('DIAMONDCMS_GITHUB_REPO', 'ophirf15/DiamondCMS'),
         'github_token' => env('DIAMONDCMS_GITHUB_TOKEN'),
     ],
     'media' => [

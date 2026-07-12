@@ -46,7 +46,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Toaster } from '@/components/ui/sonner'
 import ActionToastHost from '@/components/ui/ActionToastHost.vue'
 import { toast } from 'vue-sonner'
-import { showActionToast } from '@/lib/actionToast'
+import { apiErrorMessage } from '@/lib/apiErrorMessage'
 import { uploadMediaFile } from '@/lib/mediaUpload'
 import BuilderBlockView, { type BuilderBlock } from '@/components/builder/BuilderBlockView.vue'
 import PublicSiteChrome, { type ChromeConfig, type MenuItem as ChromeMenuItem } from '@/components/builder/PublicSiteChrome.vue'
@@ -213,7 +213,9 @@ async function api<T>(url: string, options: RequestInit = {}): Promise<T> {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf, ...(options.headers ?? {}) },
         ...options,
     })
-    if (!response.ok) throw new Error(await response.text())
+    if (!response.ok) {
+        throw new Error(apiErrorMessage(await response.text(), response.status))
+    }
     if (response.status === 204) return undefined as T
     const text = await response.text()
     if (!text) return undefined as T

@@ -30,4 +30,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Explicitly ignored `storage/app/installed.lock` so installer state is never committed.
 
-[0.1.0]: https://github.com/ophiryahalom/DiamondCMS/releases/tag/v0.1.0
+[0.1.0]: https://github.com/ophirf15/DiamondCMS/releases/tag/v0.1.0
