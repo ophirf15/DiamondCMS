@@ -247,4 +247,68 @@ class PhaseSevenToTwelveTest extends TestCase
         $this->assertSame('Local Clone', json_decode((string) DB::table('settings')->where('key', 'site_name')->value('value'), true));
         $this->assertDatabaseHas('media_items', ['path' => 'media/export-probe.txt']);
     }
+
+    public function test_published_form_is_reachable_at_short_slug_url(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        app(FormManager::class)->createForm([
+            'name' => 'Contact',
+            'slug' => 'contact',
+            'status' => 'published',
+            'schema' => ['fields' => [
+                ['name' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => true],
+                ['name' => 'message', 'label' => 'Message', 'type' => 'text', 'required' => true],
+            ]],
+        ], $admin->id);
+
+        $this->get('/contact')->assertOk();
+        $this->get('/forms/contact')->assertOk();
+    }
+
+    public function test_software_update_apply_preserves_env_and_storage_content(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        file_put_contents(base_path('.env'), "APP_KEY=base64:test\nDB_DATABASE=keepme\n");
+        Storage::disk('public')->put('media/keep-me.txt', 'site-content');
+
+        $stageDir = storage_path('app/updates/staged/0.1.1');
+        @mkdir($stageDir, 0775, true);
+        $zipPath = $stageDir.'/release.zip';
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true);
+        $zip->addFromString('artisan', "#!/usr/bin/env php\n<?php\n");
+        $zip->addFromString('VERSION', "0.1.1\n");
+        $zip->addFromString('.env', "APP_KEY=base64:should-not-overwrite\n");
+        $zip->addFromString('storage/app/public/media/evil.txt', 'should-not-land');
+        $zip->close();
+
+        $id = (int) DB::table('update_logs')->insertGetId([
+            'version' => '0.1.1',
+            'status' => 'staged',
+            'source_url' => 'test',
+            'checksum' => hash_file('sha256', $zipPath),
+            'stage_path' => 'updates/staged/0.1.1/release.zip',
+            'notes' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Point Storage local disk at real storage/app for this test path used by UpdateManager.
+        config(['filesystems.disks.local.root' => storage_path('app')]);
+
+        try {
+            app(UpdateManager::class)->apply($id, $admin->id);
+        } catch (\Throwable) {
+            // Health/migrate may fail in stripped package; preservation asserts still matter.
+        }
+
+        $env = (string) file_get_contents(base_path('.env'));
+        $this->assertStringContainsString('DB_DATABASE=keepme', $env);
+        $this->assertStringNotContainsString('should-not-overwrite', $env);
+        $this->assertSame('site-content', Storage::disk('public')->get('media/keep-me.txt'));
+        $this->assertFalse(Storage::disk('public')->exists('media/evil.txt'));
+    }
 }

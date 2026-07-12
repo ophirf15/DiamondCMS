@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { CheckCircle2, CircleAlert, Database, Shield, UserRound } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +40,14 @@ type Boot = {
 }
 
 const props = defineProps<{ boot: Boot }>()
+
+const db = reactive({
+    host: props.boot.defaults.db_host,
+    port: props.boot.defaults.db_port,
+    database: props.boot.defaults.db_database,
+    username: props.boot.defaults.db_username,
+    password: props.boot.defaults.db_password,
+})
 
 const extensionEntries = computed(() => Object.entries(props.boot.requirements.extensions))
 const writableEntries = computed(() => Object.entries(props.boot.requirements.writable ?? {}))
@@ -115,9 +123,8 @@ const writableEntries = computed(() => Object.entries(props.boot.requirements.wr
                     2. Database
                 </CardTitle>
                 <CardDescription>
-                    Local defaults: database <code class="rounded bg-muted px-1">diamondcms</code>,
-                    user <code class="rounded bg-muted px-1">diamondcms</code>,
-                    password <code class="rounded bg-muted px-1">diamondcms_local</code>.
+                    Use your Bluehost MySQL database (usually prefixed like <code class="rounded bg-muted px-1">ttmrklmy_…</code>).
+                    Host is typically <code class="rounded bg-muted px-1">localhost</code>.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -126,23 +133,23 @@ const writableEntries = computed(() => Object.entries(props.boot.requirements.wr
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div class="space-y-1.5">
                             <Label for="db_host">Host</Label>
-                            <Input id="db_host" name="db_host" :default-value="boot.defaults.db_host" required />
+                            <Input id="db_host" name="db_host" v-model="db.host" required />
                         </div>
                         <div class="space-y-1.5">
                             <Label for="db_port">Port</Label>
-                            <Input id="db_port" name="db_port" :default-value="boot.defaults.db_port" required />
+                            <Input id="db_port" name="db_port" v-model="db.port" required />
                         </div>
                         <div class="space-y-1.5">
                             <Label for="db_database">Database</Label>
-                            <Input id="db_database" name="db_database" :default-value="boot.defaults.db_database" required />
+                            <Input id="db_database" name="db_database" v-model="db.database" required />
                         </div>
                         <div class="space-y-1.5">
                             <Label for="db_username">Username</Label>
-                            <Input id="db_username" name="db_username" :default-value="boot.defaults.db_username" autocomplete="username" required />
+                            <Input id="db_username" name="db_username" v-model="db.username" autocomplete="username" required />
                         </div>
                         <div class="space-y-1.5 sm:col-span-2">
                             <Label for="db_password">Password</Label>
-                            <Input id="db_password" name="db_password" type="password" :default-value="boot.defaults.db_password" autocomplete="new-password" />
+                            <Input id="db_password" name="db_password" v-model="db.password" type="password" autocomplete="new-password" />
                         </div>
                     </div>
                     <Button type="submit" class="w-fit gap-2">
@@ -164,6 +171,12 @@ const writableEntries = computed(() => Object.entries(props.boot.requirements.wr
             <CardContent>
                 <form :action="boot.finishAction" method="post" class="grid gap-4">
                     <input type="hidden" name="_token" :value="boot.csrf">
+                    <!-- DB credentials must ship with finish — session alone is unreliable on shared hosts. -->
+                    <input type="hidden" name="db_host" :value="db.host">
+                    <input type="hidden" name="db_port" :value="db.port">
+                    <input type="hidden" name="db_database" :value="db.database">
+                    <input type="hidden" name="db_username" :value="db.username">
+                    <input type="hidden" name="db_password" :value="db.password">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div class="space-y-1.5">
                             <Label for="site_name">Site name</Label>
@@ -198,15 +211,15 @@ const writableEntries = computed(() => Object.entries(props.boot.requirements.wr
                 <details class="space-y-3">
                     <summary class="cursor-pointer text-sm font-medium text-muted-foreground">Install recovery</summary>
                     <p class="text-sm text-muted-foreground">
-                        Use only if setup was interrupted and <code class="rounded bg-muted px-1">DIAMONDCMS_RECOVERY_KEY</code> is configured.
+                        If the installer is locked after a failed run, clear the lock with your recovery key.
                     </p>
-                    <form :action="boot.recoveryAction" method="post" class="grid max-w-md gap-3">
+                    <form :action="boot.recoveryAction" method="post" class="flex flex-wrap items-end gap-3">
                         <input type="hidden" name="_token" :value="boot.csrf">
-                        <div class="space-y-1.5">
+                        <div class="min-w-56 flex-1 space-y-1.5">
                             <Label for="recovery_key">Recovery key</Label>
-                            <Input id="recovery_key" name="recovery_key" type="password" autocomplete="off" />
+                            <Input id="recovery_key" name="recovery_key" required />
                         </div>
-                        <Button type="submit" variant="outline" class="w-fit">Clear install lock</Button>
+                        <Button type="submit" variant="outline">Clear install lock</Button>
                     </form>
                 </details>
             </CardContent>

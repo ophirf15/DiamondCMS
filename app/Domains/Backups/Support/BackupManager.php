@@ -253,6 +253,7 @@ final class BackupManager
                 ? $this->replaceTables($tables)
                 : $this->mergeTables($tables);
             $mediaFiles = $this->restoreFilesFromZip($path);
+            $this->ensurePublicStorageAccessible();
         } catch (\Throwable $exception) {
             $this->restore($backupId);
             throw $exception;
@@ -563,6 +564,32 @@ final class BackupManager
         $zip->close();
 
         return $count;
+    }
+
+    /**
+     * Best-effort public/storage link so /storage/* URLs work after import.
+     * Shared hosts that block symlinks still work via the /storage/{path} route.
+     */
+    private function ensurePublicStorageAccessible(): void
+    {
+        $link = public_path('storage');
+        $target = storage_path('app/public');
+
+        if (! is_dir($target)) {
+            @mkdir($target, 0775, true);
+        }
+
+        if (is_link($link) || is_dir($link)) {
+            return;
+        }
+
+        try {
+            if (function_exists('symlink')) {
+                @symlink($target, $link);
+            }
+        } catch (\Throwable) {
+            // Route fallback in web.php serves files when the link cannot be created.
+        }
     }
 
     private function replaceTables(array $tables): void

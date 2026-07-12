@@ -1105,8 +1105,34 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             $backups->restore($backup),
         ));
         Route::get('/updates', fn () => response()->json(
-            DB::table('update_logs')->orderByDesc('id')->limit(20)->get(['id', 'version', 'status', 'checksum', 'created_at'])
+            DB::table('update_logs')->orderByDesc('id')->limit(20)->get(['id', 'version', 'status', 'checksum', 'source_url', 'created_at', 'notes'])
         ));
+        Route::get('/updates/check', function (UpdateManager $updates) {
+            return response()->json($updates->checkLatest());
+        });
+        Route::post('/updates/download', function (Request $request, UpdateManager $updates) {
+            return response()->json($updates->downloadLatest($request->user()->id), 201);
+        });
+        Route::post('/updates/upload', function (Request $request, UpdateManager $updates) {
+            $data = $request->validate([
+                'package' => ['required', 'file', 'max:512000'],
+                'version' => ['required', 'string', 'max:40'],
+                'checksum' => ['nullable', 'string', 'size:64'],
+            ]);
+
+            return response()->json(
+                $updates->stageUpload(
+                    $request->file('package'),
+                    $data['version'],
+                    $data['checksum'] ?? null,
+                    $request->user()->id,
+                ),
+                201,
+            );
+        });
+        Route::post('/updates/{update}/apply', function (int $update, Request $request, UpdateManager $updates) {
+            return response()->json($updates->apply($update, $request->user()->id));
+        });
         Route::post('/updates/stage', function (Request $request, UpdateManager $updates) {
             $data = $request->validate([
                 'source_path' => ['required', 'string'],

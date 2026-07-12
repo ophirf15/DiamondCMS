@@ -10,6 +10,10 @@ return [
     'installer_lock_path' => storage_path('app/installed.lock'),
     'scheduler_token' => env('DIAMONDCMS_SCHEDULER_TOKEN'),
     'recovery_key' => env('DIAMONDCMS_RECOVERY_KEY'),
+    'updates' => [
+        'github_repo' => env('DIAMONDCMS_GITHUB_REPO', 'ophiryahalom/DiamondCMS'),
+        'github_token' => env('DIAMONDCMS_GITHUB_TOKEN'),
+    ],
     'media' => [
         'max_upload_kb' => 51200,
         'svg_enabled' => false,

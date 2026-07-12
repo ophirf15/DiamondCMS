@@ -23,6 +23,23 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/*
+|--------------------------------------------------------------------------
+| Public disk fallback (shared hosts without symlink support)
+|--------------------------------------------------------------------------
+| Media lives in storage/app/public. Locally `php artisan storage:link`
+| maps that to public/storage. Bluehost often blocks symlinks, so /storage/*
+| would 404 after import. This route serves those files through Laravel.
+*/
+Route::get('/storage/{path}', function (string $path) {
+    $path = str_replace('\\', '/', $path);
+    $path = ltrim($path, '/');
+    abort_if($path === '' || str_contains($path, '..'), 404);
+    abort_unless(Storage::disk('public')->exists($path), 404);
+
+    return Storage::disk('public')->response($path);
+})->where('path', '.*')->name('storage.public');
+
 Route::get('/', function () {
     try {
         if (! Schema::hasTable('pages')) {
@@ -206,14 +223,52 @@ Route::prefix('install')->name('install.')->group(function (): void {
             'admin_name' => ['required', 'string', 'max:120'],
             'admin_email' => ['required', 'email'],
             'admin_password' => ['required', 'confirmed', 'min:12'],
+            'db_host' => ['required', 'string'],
+            'db_port' => ['required', 'integer'],
+            'db_database' => ['required', 'string'],
+            'db_username' => ['required', 'string'],
+            'db_password' => ['nullable', 'string'],
         ]);
 
-        installer_write_env(array_merge(session('installer.db', []), [
+        $db = [
+            'db_host' => $data['db_host'],
+            'db_port' => (int) $data['db_port'],
+            'db_database' => $data['db_database'],
+            'db_username' => $data['db_username'],
+            'db_password' => $data['db_password'] ?? '',
+        ];
+
+        // Verify with the submitted credentials (do not rely on session alone).
+        config(['database.connections.install_check' => [
+            'driver' => 'mysql',
+            'host' => $db['db_host'],
+            'port' => $db['db_port'],
+            'database' => $db['db_database'],
+            'username' => $db['db_username'],
+            'password' => $db['db_password'],
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+        ]]);
+        DB::purge('install_check');
+        DB::connection('install_check')->getPdo();
+
+        installer_write_env(array_merge($db, [
             'APP_NAME' => $data['site_name'],
             'APP_URL' => $data['base_url'],
         ]));
+
+        // Writing .env does not reload runtime config — apply DB settings before migrate.
+        installer_apply_database($db);
         Artisan::call('key:generate', ['--force' => true]);
+        // key:generate may rewrite .env; re-apply DB and reconnect.
+        installer_apply_database($db);
         Artisan::call('migrate', ['--force' => true]);
+
+        try {
+            Artisan::call('storage:link');
+        } catch (Throwable) {
+            // Shared hosts may forbid symlinks; /storage/{path} route covers that.
+        }
 
         $admin = User::updateOrCreate(
             ['email' => $data['admin_email']],
@@ -321,22 +376,31 @@ Route::get('/robots.txt', fn (SeoManager $seo) => response($seo->robots(), 200, 
 
 Route::get('/404', fn () => response()->view('public.404', [], 404))->name('not-found');
 
-Route::get('/{slug}', function (string $slug, Request $request) {
+Route::get('/{slug}', function (string $slug, Request $request, FormManager $forms) {
     if ($redirect = app(SeoManager::class)->redirectFor($slug)) {
         return redirect()->to($redirect->target, (int) $redirect->status_code);
     }
 
-    $page = DB::table('pages')->where('slug', $slug)->where('status', 'published')->firstOrFail();
-    if ($page->password_hash && ! Hash::check((string) $request->session()->get('page-password-'.$page->id), $page->password_hash)) {
-        return view('public.password', ['page' => $page]);
+    $page = DB::table('pages')->where('slug', $slug)->where('status', 'published')->whereNull('deleted_at')->first();
+    if ($page) {
+        if ($page->password_hash && ! Hash::check((string) $request->session()->get('page-password-'.$page->id), $page->password_hash)) {
+            return view('public.password', ['page' => $page]);
+        }
+
+        try {
+            app(AnalyticsManager::class)->trackPageView($page, $request);
+        } catch (Throwable) {
+        }
+
+        return view('public.page', ['page' => $page, 'content' => BuilderDocument::render(json_decode($page->builder_json, true) ?: BuilderDocument::empty($page->title))]);
     }
 
+    // Allow short URLs like /contact for published forms (also available at /forms/{slug}).
     try {
-        app(AnalyticsManager::class)->trackPageView($page, $request);
+        return view('public.forms.show', ['form' => $forms->publicForm($slug)]);
     } catch (Throwable) {
+        abort(404);
     }
-
-    return view('public.page', ['page' => $page, 'content' => BuilderDocument::render(json_decode($page->builder_json, true) ?: BuilderDocument::empty($page->title))]);
 })->name('page.show');
 
 Route::post('/{slug}/password', function (string $slug, Request $request) {
@@ -372,6 +436,10 @@ if (! function_exists('installer_write_env')) {
         $map = [
             'APP_NAME' => $values['APP_NAME'] ?? 'DiamondCMS',
             'APP_URL' => $values['APP_URL'] ?? url('/'),
+            'APP_KEY' => $values['APP_KEY'] ?? (config('app.key') ?: ('base64:'.base64_encode(random_bytes(32)))),
+            'SESSION_DRIVER' => 'file',
+            'CACHE_STORE' => 'file',
+            'QUEUE_CONNECTION' => 'sync',
             'DB_CONNECTION' => 'mysql',
             'DB_HOST' => $values['db_host'] ?? '127.0.0.1',
             'DB_PORT' => $values['db_port'] ?? '3306',
@@ -389,5 +457,30 @@ if (! function_exists('installer_write_env')) {
 
         Storage::disk('local')->put('installer-recovery.json', json_encode(['updated_at' => now(), 'keys' => array_keys($map)], JSON_PRETTY_PRINT));
         file_put_contents($path, $contents);
+    }
+}
+
+if (! function_exists('installer_apply_database')) {
+    /**
+     * @param  array{db_host: string, db_port: int|string, db_database: string, db_username: string, db_password?: string|null}  $db
+     */
+    function installer_apply_database(array $db): void
+    {
+        $password = (string) ($db['db_password'] ?? '');
+
+        config([
+            'database.default' => 'mysql',
+            'database.connections.mysql.driver' => 'mysql',
+            'database.connections.mysql.host' => $db['db_host'],
+            'database.connections.mysql.port' => (string) $db['db_port'],
+            'database.connections.mysql.database' => $db['db_database'],
+            'database.connections.mysql.username' => $db['db_username'],
+            'database.connections.mysql.password' => $password,
+            'database.connections.mysql.charset' => 'utf8mb4',
+            'database.connections.mysql.collation' => 'utf8mb4_unicode_ci',
+        ]);
+
+        DB::purge('mysql');
+        DB::reconnect('mysql');
     }
 }
