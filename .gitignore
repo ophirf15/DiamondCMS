@@ -26,3 +26,19 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local brand source pack (not for the public repo)
+/Diamond Brand logo/
+
+# Internal planning docs (may include personal/site content plans)
+/DiamondCMS_Phased_Plan/
+
+# Local runtime / test data (also covered by storage/app/* gitignores)
+/storage/app/private/backups/
+/storage/app/private/exports/
+/storage/app/private/imports/
+/storage/app/releases/
+/storage/app/public/media/
+/database/*.sqlite
+/database/*.sqlite-journal
+/*.sql

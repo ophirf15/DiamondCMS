@@ -8,8 +8,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 use RuntimeException;
 
 final class MediaManager
@@ -154,17 +154,17 @@ final class MediaManager
     private function createImageVariants(string $path): array
     {
         $source = Storage::disk('public')->path($path);
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
         $variants = [];
 
         foreach ([320, 768, 1280] as $width) {
-            $image = $manager->read($source);
+            $image = $manager->decodePath($source);
             if ($image->width() <= $width) {
                 continue;
             }
 
             $variantPath = preg_replace('/\.[^.]+$/', "-{$width}.webp", $path) ?: $path.'.webp';
-            $image->scale(width: $width)->toWebp(quality: 82)->save(Storage::disk('public')->path($variantPath));
+            $image->scale(width: $width)->save(Storage::disk('public')->path($variantPath), quality: 82);
             $variants[(string) $width] = $variantPath;
         }
 

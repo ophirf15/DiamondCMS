@@ -97,7 +97,7 @@ final class BackupManager
         Storage::disk('local')->makeDirectory('exports');
         $zipPath = Storage::disk('local')->path($relative);
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new \RuntimeException('Unable to create site export ZIP.');
         }
@@ -159,9 +159,10 @@ final class BackupManager
             'checksum' => $checksum,
         ];
     }
+
     public function dryRunImport(string $path): array
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             return ['ok' => false, 'errors' => ['Unable to open import ZIP.']];
         }
@@ -213,7 +214,7 @@ final class BackupManager
     public function restore(int $backupId): array
     {
         $backup = DB::table('backups')->where('id', $backupId)->first();
-        abort_unless($backup, 404);
+        abort_unless($backup !== null, 404);
 
         $payload = json_decode(Storage::disk($backup->disk)->get($backup->path), true) ?: [];
         $tables = $payload['tables'] ?? [];
@@ -326,7 +327,7 @@ final class BackupManager
 
     private function importTables(string $path): array
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             throw new \RuntimeException('Unable to open import ZIP.');
         }
@@ -521,9 +522,10 @@ final class BackupManager
 
         return $count;
     }
+
     private function restoreFilesFromZip(string $path): int
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             return 0;
         }

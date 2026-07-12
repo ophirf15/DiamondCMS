@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Domains\Activity\Support\ActivityLogger;
 use App\Domains\Analytics\Support\AnalyticsManager;
 use App\Domains\Builder\Support\BuilderDocument;
@@ -19,7 +21,6 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 Route::get('/', function () {
@@ -37,7 +38,7 @@ Route::get('/', function () {
     if ($home) {
         try {
             app(AnalyticsManager::class)->trackPageView($home);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Analytics table may not exist yet during upgrades.
         }
 
@@ -221,7 +222,7 @@ Route::prefix('install')->name('install.')->group(function (): void {
 
     Route::post('/recovery/clear-lock', function (Request $request) {
         $request->validate(['recovery_key' => ['required', 'string']]);
-        abort_unless(hash_equals((string) env('DIAMONDCMS_RECOVERY_KEY'), $request->string('recovery_key')->toString()), 403);
+        abort_unless(hash_equals((string) config('diamondcms.recovery_key'), $request->string('recovery_key')->toString()), 403);
         InstallState::clearLock();
 
         return back()->with('status', 'Install lock cleared.');
@@ -269,7 +270,7 @@ Route::get('/resume/{slug}/download/{format}', function (string $slug, string $f
     $variant = DB::table('resume_variants')->where('slug', $slug)->where('visibility', 'public')->firstOrFail();
     try {
         app(AnalyticsManager::class)->trackResumeDownload((int) $variant->id);
-    } catch (\Throwable) {
+    } catch (Throwable) {
     }
 
     return $resumes->downloadFileResponse($variant, $format);
@@ -279,7 +280,7 @@ Route::get('/resume/{slug}/print', function (string $slug, ResumeManager $resume
     $variant = DB::table('resume_variants')->where('slug', $slug)->where('visibility', 'public')->firstOrFail();
     try {
         app(AnalyticsManager::class)->trackResumeDownload((int) $variant->id);
-    } catch (\Throwable) {
+    } catch (Throwable) {
     }
 
     // Prefer curated PDF when available.
@@ -326,7 +327,7 @@ Route::get('/{slug}', function (string $slug, Request $request) {
 
     try {
         app(AnalyticsManager::class)->trackPageView($page, $request);
-    } catch (\Throwable) {
+    } catch (Throwable) {
     }
 
     return view('public.page', ['page' => $page, 'content' => BuilderDocument::render(json_decode($page->builder_json, true) ?: BuilderDocument::empty($page->title))]);

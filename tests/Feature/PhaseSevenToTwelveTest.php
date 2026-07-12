@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Domains\AI\Support\AiManager;
@@ -165,7 +167,7 @@ class PhaseSevenToTwelveTest extends TestCase
         ]);
 
         $zipPath = storage_path('app/import-test.zip');
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         $zip->addFromString('manifest.json', json_encode(['version' => '0.1.0']));
         $zip->addFromString('content.json', json_encode(['tables' => [
@@ -228,7 +230,7 @@ class PhaseSevenToTwelveTest extends TestCase
         $this->assertGreaterThan(0, $export['media_library_files']);
         $this->assertSame([], $export['missing_media']);
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $this->assertTrue($zip->open($export['path']) === true);
         $this->assertNotFalse($zip->locateName('files/public/media/export-probe.txt'));
         $zip->close();

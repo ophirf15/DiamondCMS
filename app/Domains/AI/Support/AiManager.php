@@ -28,10 +28,10 @@ final class AiManager
         $payload = [
             'provider' => $provider,
             'name' => $name,
-            'encrypted_api_key' => filled($data['api_key'] ?? null) ? Crypt::encryptString((string) $data['api_key']) : $existing?->encrypted_api_key,
+            'encrypted_api_key' => filled($data['api_key'] ?? null) ? Crypt::encryptString((string) $data['api_key']) : (is_object($existing) ? $existing->encrypted_api_key : null),
             'base_url' => $data['base_url'] ?? null,
-            'models' => json_encode($data['models'] ?? (json_decode((string) ($existing?->models ?? ''), true) ?: $this->fallbackModels($provider)), JSON_THROW_ON_ERROR),
-            'default_model' => $data['default_model'] ?? $existing?->default_model ?? $this->fallbackModels($provider)[0],
+            'models' => json_encode($data['models'] ?? (json_decode((string) (is_object($existing) ? ($existing->models ?? '') : ''), true) ?: $this->fallbackModels($provider)), JSON_THROW_ON_ERROR),
+            'default_model' => $data['default_model'] ?? (is_object($existing) ? $existing->default_model : null) ?? $this->fallbackModels($provider)[0],
             'is_enabled' => (bool) ($data['is_enabled'] ?? true),
             'monthly_token_limit' => $data['monthly_token_limit'] ?? null,
             'monthly_cost_limit' => $data['monthly_cost_limit'] ?? null,
@@ -53,7 +53,7 @@ final class AiManager
     public function discoverModels(int $providerId): array
     {
         $provider = DB::table('ai_providers')->where('id', $providerId)->first();
-        abort_unless($provider, 404);
+        abort_unless($provider !== null, 404);
 
         if (! $provider->encrypted_api_key) {
             return $this->fallbackModels($provider->provider);

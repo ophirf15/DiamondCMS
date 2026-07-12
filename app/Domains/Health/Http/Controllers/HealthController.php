@@ -11,9 +11,7 @@ use Illuminate\Http\Request;
 
 final class HealthController extends Controller
 {
-    public function __construct(private readonly HealthCheckService $health)
-    {
-    }
+    public function __construct(private readonly HealthCheckService $health) {}
 
     public function public(): JsonResponse
     {

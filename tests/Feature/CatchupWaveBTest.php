@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Domains\Builder\Support\BuilderDocument;
@@ -8,6 +10,7 @@ use App\Domains\Resume\Support\ResumeManager;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CatchupWaveBTest extends TestCase
@@ -75,11 +78,17 @@ class CatchupWaveBTest extends TestCase
         $this->get('/resume/'.$variant['slug'])->assertOk()->assertSee('Ophir')->assertSee('Built Wave B');
         $this->get('/resume/'.$variant['slug'].'/print')->assertOk()->assertHeader('X-DiamondCMS-PDF-Mode', 'browser-print');
 
+        DB::table('resume_variants')->where('id', $variant['id'])->update([
+            'download_pdf' => '/storage/media/sample.pdf',
+            'download_docx' => '/storage/media/sample.docx',
+        ]);
+
         $html = BuilderDocument::render([
             'schema' => BuilderDocument::CURRENT_SCHEMA,
             'blocks' => [['type' => 'resume-download', 'props' => ['text' => 'Get résumé']]],
         ])->toHtml();
-        $this->assertStringContainsString('/resume/'.$variant['slug'].'/print', $html);
+        $this->assertStringContainsString('/resume/'.$variant['slug'].'/download/pdf', $html);
+        $this->assertStringContainsString('/resume/'.$variant['slug'].'/download/docx', $html);
         $this->assertStringContainsString('Get résumé', $html);
     }
 
@@ -226,7 +235,7 @@ class CatchupWaveBTest extends TestCase
         $backup = $this->postJson('/admin/api/backups', ['type' => 'full'])->assertCreated()->json();
         $this->getJson('/admin/api/backups')->assertOk()->assertJsonFragment(['id' => $backup['id']]);
 
-        \Illuminate\Support\Facades\Storage::disk('public')->put('media/api-export.txt', 'via-api');
+        Storage::disk('public')->put('media/api-export.txt', 'via-api');
         $export = $this->postJson('/admin/api/exports')->assertOk()->json();
         $this->assertArrayHasKey('download_url', $export);
         $this->assertArrayHasKey('media_files', $export);

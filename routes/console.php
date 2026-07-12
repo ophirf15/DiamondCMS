@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Domains\Installer\Support\InstallState;
 use App\Models\User;
 use Illuminate\Foundation\Inspiring;

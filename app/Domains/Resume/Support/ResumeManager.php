@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Resume\Support;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -80,7 +81,6 @@ final class ResumeManager
     }
 
     /**
-     * @param  mixed  $links
      * @return list<array{label: string, url: string}>
      */
     public static function normalizeLinks(mixed $links): array
@@ -150,7 +150,7 @@ final class ResumeManager
         DB::table('resume_variants')->where('id', $variantId)->delete();
     }
 
-    /** @param \Illuminate\Support\Collection<int, object>|iterable<int, object> $sections */
+    /** @param Collection<int, object>|iterable<int, object> $sections */
     public static function groupSections(iterable $sections): array
     {
         $grouped = [];
@@ -310,7 +310,7 @@ final class ResumeManager
         return DB::table('resume_profiles')->orderBy('id')->first();
     }
 
-    /** @return \Illuminate\Support\Collection<int, object> */
+    /** @return Collection<int, \stdClass> */
     public function primaryExperienceItems()
     {
         $profile = $this->primaryPublicProfile();
@@ -323,7 +323,7 @@ final class ResumeManager
             ->whereIn('type', ['experience', 'work', 'employment'])
             ->orderBy('sort_order')
             ->get()
-            ->map(function (object $section): object {
+            ->map(function (\stdClass $section): \stdClass {
                 $bullets = json_decode((string) $section->bullets, true) ?: [];
                 $section->body = is_array($bullets) ? implode(' ', $bullets) : (string) $section->title;
 
@@ -334,7 +334,7 @@ final class ResumeManager
     public function renderHtml(int $variantId): string
     {
         $variant = DB::table('resume_variants')->where('id', $variantId)->first();
-        abort_unless($variant, 404);
+        abort_unless($variant !== null, 404);
         $profile = DB::table('resume_profiles')->where('id', $variant->resume_profile_id)->first();
         $sections = DB::table('resume_sections')->where('resume_profile_id', $profile->id)->orderBy('sort_order')->get();
 
@@ -367,7 +367,7 @@ final class ResumeManager
         }
 
         if ($extension === 'docx') {
-            $zip = new \ZipArchive();
+            $zip = new \ZipArchive;
             if ($zip->open($path) === true) {
                 $xml = $zip->getFromName('word/document.xml') ?: '';
                 $zip->close();
@@ -378,7 +378,7 @@ final class ResumeManager
 
         if ($extension === 'pdf') {
             try {
-                $parser = new PdfParser();
+                $parser = new PdfParser;
                 $pdf = $parser->parseFile($path);
 
                 return trim($pdf->getText());
@@ -442,7 +442,7 @@ final class ResumeManager
     }
 
     /**
-     * @param array<int, string> $lines
+     * @param  array<int, string>  $lines
      * @return array<int, array<string, mixed>>
      */
     private function parseSections(array $lines): array
@@ -451,39 +451,12 @@ final class ResumeManager
         $currentType = null;
         $buffer = [];
 
-        $flush = function () use (&$sections, &$currentType, &$buffer): void {
-            if ($currentType === null || $buffer === []) {
-                $buffer = [];
-
-                return;
-            }
-
-            if ($currentType === 'skills') {
-                $sections[] = [
-                    'type' => 'skills',
-                    'title' => 'Skills',
-                    'organization' => null,
-                    'date' => null,
-                    'bullets' => array_values(array_filter($buffer)),
-                ];
-            } elseif ($currentType === 'education') {
-                foreach ($this->chunkEntries($buffer) as $entry) {
-                    $sections[] = $entry + ['type' => 'education'];
-                }
-            } else {
-                foreach ($this->chunkEntries($buffer) as $entry) {
-                    $sections[] = $entry + ['type' => $currentType];
-                }
-            }
-
-            $buffer = [];
-        };
-
         foreach ($lines as $line) {
             $heading = $this->mapSectionHeading($line);
             if ($heading !== null) {
-                $flush();
+                $this->flushParsedSection($sections, $currentType, $buffer);
                 $currentType = $heading;
+
                 continue;
             }
 
@@ -494,7 +467,7 @@ final class ResumeManager
             $buffer[] = $line;
         }
 
-        $flush();
+        $this->flushParsedSection($sections, $currentType, $buffer);
 
         if ($sections === []) {
             $sections[] = [
@@ -507,6 +480,39 @@ final class ResumeManager
         }
 
         return $sections;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $sections
+     * @param  array<int, string>  $buffer
+     */
+    private function flushParsedSection(array &$sections, ?string &$currentType, array &$buffer): void
+    {
+        if ($currentType === null || $buffer === []) {
+            $buffer = [];
+
+            return;
+        }
+
+        if ($currentType === 'skills') {
+            $sections[] = [
+                'type' => 'skills',
+                'title' => 'Skills',
+                'organization' => null,
+                'date' => null,
+                'bullets' => array_values(array_filter($buffer)),
+            ];
+        } elseif ($currentType === 'education') {
+            foreach ($this->chunkEntries($buffer) as $entry) {
+                $sections[] = $entry + ['type' => 'education'];
+            }
+        } else {
+            foreach ($this->chunkEntries($buffer) as $entry) {
+                $sections[] = $entry + ['type' => $currentType];
+            }
+        }
+
+        $buffer = [];
     }
 
     private function isSectionHeading(string $line): bool
@@ -531,7 +537,7 @@ final class ResumeManager
     }
 
     /**
-     * @param array<int, string> $lines
+     * @param  array<int, string>  $lines
      * @return array<int, array<string, mixed>>
      */
     private function chunkEntries(array $lines): array
@@ -556,6 +562,7 @@ final class ResumeManager
                     'date' => $line,
                     'bullets' => [],
                 ];
+
                 continue;
             }
 
@@ -566,11 +573,13 @@ final class ResumeManager
                     'date' => null,
                     'bullets' => [],
                 ];
+
                 continue;
             }
 
             if ($isBullet) {
                 $current['bullets'][] = ltrim($line, "•-* \t");
+
                 continue;
             }
 

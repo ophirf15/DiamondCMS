@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Portfolio\Support;
 
 use App\Domains\Builder\Support\BuilderDocument;
+use App\Domains\Design\Support\DesignManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -131,7 +132,6 @@ final class PortfolioManager
     }
 
     /**
-     * @param  mixed  $gallery
      * @return list<array{src: string, alt: string}>
      */
     public static function normalizeGallery(mixed $gallery): array
@@ -144,6 +144,7 @@ final class PortfolioManager
         foreach ($gallery as $row) {
             if (is_string($row) && trim($row) !== '') {
                 $items[] = ['src' => trim($row), 'alt' => ''];
+
                 continue;
             }
             if (! is_array($row)) {
@@ -163,7 +164,6 @@ final class PortfolioManager
     }
 
     /**
-     * @param  mixed  $logos
      * @return list<array{label: string, icon: string, image: string, url: string}>
      */
     public static function normalizeLogos(mixed $logos): array
@@ -255,7 +255,7 @@ final class PortfolioManager
             ->whereNull('deleted_at')
             ->first();
 
-        abort_unless($project, 404);
+        abort_unless($project !== null, 404);
 
         return $this->decodeProject($project);
     }
@@ -272,9 +272,9 @@ final class PortfolioManager
         $title = e((string) $project->title);
         $summary = e((string) ($project->summary ?? ''));
         $cover = trim((string) ($project->cover_image ?? ''));
-        $fit = \App\Domains\Design\Support\DesignManager::portfolioAttr(
+        $fit = DesignManager::portfolioAttr(
             'cardFit',
-            \App\Domains\Design\Support\DesignManager::portfolioMediaFits(),
+            DesignManager::portfolioMediaFits(),
             'contain'
         );
 
@@ -297,6 +297,7 @@ final class PortfolioManager
         foreach (['skills', 'tags', 'metrics', 'before_after_media', 'gallery', 'logos', 'builder_json'] as $field) {
             if (! property_exists($project, $field) && ! isset($project->{$field})) {
                 $project->{$field} = [];
+
                 continue;
             }
             $raw = $project->{$field} ?? null;

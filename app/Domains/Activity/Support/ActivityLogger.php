@@ -14,7 +14,7 @@ final class ActivityLogger
     {
         try {
             DB::table('activity_logs')->insert([
-                'user_id' => $request?->user()?->id ?? auth()->id(),
+                'user_id' => ($request !== null ? $request->user()?->id : null) ?? auth()->id(),
                 'event' => $event,
                 'subject_type' => $subject ? $subject::class : null,
                 'subject_id' => $subject->id ?? null,

@@ -27,7 +27,7 @@ if (! function_exists('diamondcms_setting')) {
     {
         try {
             $raw = DB::table('settings')->where('key', $key)->value('value');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return $default;
         }
 
@@ -58,7 +58,7 @@ if (! function_exists('diamondcms_menu')) {
     {
         try {
             return MenuManager::publicItems($location);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
     }
@@ -69,7 +69,7 @@ if (! function_exists('diamondcms_logo_url')) {
     {
         try {
             return DesignManager::logoUrl();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return '/brand/logo-primary-gold.svg';
         }
     }
@@ -83,7 +83,7 @@ if (! function_exists('diamondcms_custom_head')) {
                 'css' => json_decode((string) DB::table('settings')->where('key', 'custom_css')->value('value'), true) ?: '',
                 'js' => json_decode((string) DB::table('settings')->where('key', 'custom_js_head')->value('value'), true) ?: '',
             ]);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $settings = ['css' => '', 'js' => ''];
         }
 

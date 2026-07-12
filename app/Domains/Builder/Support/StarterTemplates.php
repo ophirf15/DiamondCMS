@@ -515,7 +515,7 @@ final class StarterTemplates
                             ]),
                             self::section('0.5rem', [
                                 self::heading(2, 'Operator · Builder'),
-                                self::text("I manage multifamily communities by day and ship software by night. This page is the long version of that story."),
+                                self::text('I manage multifamily communities by day and ship software by night. This page is the long version of that story.'),
                                 self::block('social-links', [
                                     'variant' => 'icons-labels',
                                     'items' => [
@@ -555,7 +555,7 @@ final class StarterTemplates
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
+     * @param  array<int, array<string, mixed>>  $blocks
      * @return array<string, mixed>
      */
     private static function doc(string $title, string $shell, string $previewTheme, array $blocks): array
@@ -604,8 +604,8 @@ final class StarterTemplates
     }
 
     /**
-     * @param array<string, mixed> $props
-     * @param array<int, array<string, mixed>>|null $children
+     * @param  array<string, mixed>  $props
+     * @param  array<int, array<string, mixed>>|null  $children
      * @return array<string, mixed>
      */
     private static function block(string $type, array $props = [], ?array $children = null): array

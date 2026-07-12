@@ -29,6 +29,7 @@ foreach ($iterator as $item) {
     $target = $releaseDir.'/'.$relative;
     if ($item->isDir()) {
         @mkdir($target, 0775, true);
+
         continue;
     }
 
@@ -48,7 +49,7 @@ file_put_contents($releaseDir.'/release-manifest.json', json_encode([
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
 remove_file($zipPath);
-$zip = new ZipArchive();
+$zip = new ZipArchive;
 if ($zip->open($zipPath, ZipArchive::CREATE) !== true) {
     throw new RuntimeException('Unable to create release zip.');
 }

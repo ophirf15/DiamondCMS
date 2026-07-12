@@ -9,10 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 final class MenuManager
 {
-    /** @return Collection<int, object> */
+    /** @return Collection<int, \stdClass> */
     public static function allWithItems(): Collection
     {
-        return DB::table('menus')->orderBy('location')->get()->map(function (object $menu): object {
+        return DB::table('menus')->orderBy('location')->get()->map(function (\stdClass $menu): \stdClass {
             $menu->items = self::treeForMenu((int) $menu->id);
 
             return $menu;

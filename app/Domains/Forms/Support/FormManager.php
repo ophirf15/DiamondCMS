@@ -42,7 +42,7 @@ final class FormManager
     public function updateForm(int $formId, array $data, ?int $userId = null): object
     {
         $existing = DB::table('forms')->where('id', $formId)->whereNull('deleted_at')->first();
-        abort_unless($existing, 404);
+        abort_unless($existing !== null, 404);
 
         $payload = ['updated_at' => now()];
 
@@ -83,7 +83,7 @@ final class FormManager
     public function find(int $formId): object
     {
         $form = DB::table('forms')->where('id', $formId)->whereNull('deleted_at')->first();
-        abort_unless($form, 404);
+        abort_unless($form !== null, 404);
 
         return $this->decodeForm($form);
     }
@@ -109,7 +109,7 @@ final class FormManager
     public function publicForm(string $slug): object
     {
         $form = DB::table('forms')->where('slug', $slug)->where('status', 'published')->whereNull('deleted_at')->first();
-        abort_unless($form, 404);
+        abort_unless($form !== null, 404);
 
         return $this->decodeForm($form);
     }
@@ -147,10 +147,10 @@ final class FormManager
         return $submissionId;
     }
 
-    /** @return Collection<int, object> */
+    /** @return Collection<int, \stdClass> */
     public function submissions(int $formId): Collection
     {
-        return DB::table('form_submissions')->where('form_id', $formId)->whereNull('deleted_at')->latest()->get()->map(function (object $row): object {
+        return DB::table('form_submissions')->where('form_id', $formId)->whereNull('deleted_at')->latest()->get()->map(function (\stdClass $row): \stdClass {
             $row->payload = json_decode((string) $row->payload, true) ?: [];
             $row->files = json_decode((string) $row->files, true) ?: [];
 

@@ -1,7 +1,9 @@
 <?php
 
-use App\Domains\AI\Support\AiManager;
+declare(strict_types=1);
+
 use App\Domains\Activity\Support\ActivityLogger;
+use App\Domains\AI\Support\AiManager;
 use App\Domains\Analytics\Support\AnalyticsManager;
 use App\Domains\Backups\Support\BackupManager;
 use App\Domains\Builder\Support\BuilderDocument;
@@ -9,6 +11,7 @@ use App\Domains\Builder\Support\StarterTemplates;
 use App\Domains\Design\Support\DesignManager;
 use App\Domains\Design\Support\MenuManager;
 use App\Domains\Forms\Support\FormManager;
+use App\Domains\Installer\Support\InstallState;
 use App\Domains\Mail\Support\MailSettingsManager;
 use App\Domains\Media\Support\MediaManager;
 use App\Domains\Portfolio\Support\PortfolioManager;
@@ -24,7 +27,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 Route::middleware(['auth', 'admin'])->group(function (): void {
@@ -244,7 +246,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                     'scheduled' => DB::table('pages')->where('status', 'scheduled')->count(),
                 ],
                 'checklist' => [
-                    'installed' => \App\Domains\Installer\Support\InstallState::isInstalled(),
+                    'installed' => InstallState::isInstalled(),
                     'homepage' => DB::table('pages')->where('slug', 'home')->exists(),
                     'branding' => DB::table('settings')->where('key', 'design_tokens')->exists(),
                 ],
@@ -264,7 +266,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             'label' => $item['label'],
             'url' => $item['url'],
         ])->values()->all();
-        $chrome = \App\Domains\Design\Support\DesignManager::chrome();
+        $chrome = DesignManager::chrome();
 
         $publicUrl = $row->status === 'published'
             ? url('/'.$row->slug)
@@ -287,9 +289,9 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 'publicUrl' => $publicUrl,
                 'shell' => $document['meta']['shell'] ?? 'default',
                 'chrome' => [
-                    'headerStyle' => \App\Domains\Design\Support\DesignManager::headerStyle(),
-                    'footerStyle' => \App\Domains\Design\Support\DesignManager::footerStyle(),
-                    'buttonStyle' => \App\Domains\Design\Support\DesignManager::buttonStyle(),
+                    'headerStyle' => DesignManager::headerStyle(),
+                    'footerStyle' => DesignManager::footerStyle(),
+                    'buttonStyle' => DesignManager::buttonStyle(),
                     'footerShowLogo' => (bool) ($chrome['footerShowLogo'] ?? true),
                     'footerShowSiteName' => (bool) ($chrome['footerShowSiteName'] ?? true),
                     'footerTagline' => (string) ($chrome['footerTagline'] ?? ''),
@@ -299,9 +301,9 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                     'footerSocials' => is_array($chrome['footerSocials'] ?? null) ? array_values($chrome['footerSocials']) : [],
                     'footerSocialStyle' => (string) ($chrome['footerSocialStyle'] ?? 'icons'),
                 ],
-                'visitorToggle' => \App\Domains\Design\Support\DesignManager::visitorToggleEnabled(),
-                'themeDefault' => \App\Domains\Design\Support\DesignManager::resolvedDefaultTheme(),
-                'themeLock' => \App\Domains\Design\Support\DesignManager::themeLocked(),
+                'visitorToggle' => DesignManager::visitorToggleEnabled(),
+                'themeDefault' => DesignManager::resolvedDefaultTheme(),
+                'themeLock' => DesignManager::themeLocked(),
             ],
         ]);
     })->name('live');
@@ -320,7 +322,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             ];
             try {
                 $payload['analytics'] = $analytics->dashboard();
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $payload['analytics'] = [
                     'page_views_today' => 0,
                     'page_views_7d' => 0,
@@ -703,7 +705,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
                 (string) $request->user()->email,
                 $secret,
             );
-            $qrSvg = (new Writer(new ImageRenderer(new RendererStyle(220), new SvgImageBackEnd())))->writeString($otpauth);
+            $qrSvg = (new Writer(new ImageRenderer(new RendererStyle(220), new SvgImageBackEnd)))->writeString($otpauth);
 
             return response()->json([
                 'secret' => $secret,
@@ -817,7 +819,7 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             $mediaId = null;
             try {
                 $mediaId = $media->store($request->file('file'), $request->user()->id);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $mediaId = null;
             }
             $id = $resumes->createImport($request->file('file'), $request->integer('resume_profile_id') ?: null, $mediaId, $request->user()->id);
@@ -1138,6 +1140,7 @@ if (! function_exists('page_payload')) {
 if (! function_exists('page_columns')) {
     function page_columns(array $data, array $builder, bool $creating = true): array
     {
+        /** @var array<string, mixed> $columns */
         $columns = [];
         foreach (['title', 'slug', 'status', 'locale', 'excerpt', 'meta_title', 'meta_description', 'scheduled_for'] as $key) {
             if (array_key_exists($key, $data)) {
@@ -1149,7 +1152,7 @@ if (! function_exists('page_columns')) {
         if (array_key_exists('password', $data)) {
             $columns['password_hash'] = $data['password'] ? Hash::make($data['password']) : null;
         }
-        if (($columns['status'] ?? null) === 'published' && empty($columns['published_at'])) {
+        if (($columns['status'] ?? null) === 'published' && empty($columns['published_at'] ?? null)) {
             $columns['published_at'] = now();
         }
 
@@ -1194,7 +1197,7 @@ if (! function_exists('save_menu_items')) {
 
 if (! function_exists('apply_template_site_defaults')) {
     /**
-     * @param array<string, mixed> $builder
+     * @param  array<string, mixed>  $builder
      */
     function apply_template_site_defaults(array $builder): void
     {

@@ -10,6 +10,7 @@ use App\Domains\Forms\Support\FormManager;
 use App\Domains\Portfolio\Support\PortfolioManager;
 use App\Domains\Resume\Support\ResumeManager;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -292,7 +293,7 @@ final class BuilderDocument
     private static function resumeDownload(array $props): string
     {
         $label = e((string) Arr::get($props, 'text', 'Download resume'));
-        $variant = \Illuminate\Support\Facades\DB::table('resume_variants')
+        $variant = DB::table('resume_variants')
             ->where('visibility', 'public')
             ->orderByDesc('updated_at')
             ->first();

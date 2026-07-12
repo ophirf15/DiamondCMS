@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Domains\Builder\Support\BuilderDocument;
@@ -11,6 +13,7 @@ use App\Domains\Mail\Support\MailSettingsManager;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class CatchupWaveATest extends TestCase
@@ -113,7 +116,7 @@ class CatchupWaveATest extends TestCase
 
     public function test_form_embed_ssr_and_notification_mail(): void
     {
-        \Illuminate\Support\Facades\Mail::fake();
+        Mail::fake();
         $admin = User::factory()->create(['is_admin' => true, 'email' => 'owner@example.com']);
 
         app(MailSettingsManager::class)->save([

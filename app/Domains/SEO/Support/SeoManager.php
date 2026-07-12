@@ -72,7 +72,7 @@ final class SeoManager
         ]);
     }
 
-    /** @return Collection<int, object> */
+    /** @return Collection<int, \stdClass> */
     public function activeRedirects(): Collection
     {
         return DB::table('redirects')->where('is_active', true)->orderBy('source')->get();
