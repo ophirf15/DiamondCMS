@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import {
     ArrowLeft,
@@ -121,6 +121,7 @@ type EditorMode = 'browse' | 'edit'
 const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
 const activePanel = ref<NavId>('pages')
 const mode = ref<EditorMode>('browse')
+const sidebarOpen = ref(false)
 const emptyAnalytics = (): AnalyticsSummary => ({
     page_views_today: 0,
     page_views_7d: 0,
@@ -186,6 +187,21 @@ const navItems: { id: NavId, label: string, icon: typeof LayoutDashboard }[] = [
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'account', label: 'Account', icon: Shield },
 ]
+
+const activePanelLabel = computed(() => navItems.find((item) => item.id === activePanel.value)?.label ?? 'Admin')
+
+function closeSidebar(): void {
+    sidebarOpen.value = false
+}
+
+function openSidebar(): void {
+    sidebarOpen.value = true
+}
+
+function navigateTo(panel: NavId): void {
+    activePanel.value = panel
+    closeSidebar()
+}
 
 const friendlyBlocks = computed(() => registry.value.filter((block) => !['html'].includes(block.type)))
 const leftTab = ref<'blocks' | 'sections'>('sections')
@@ -407,10 +423,12 @@ function openEditor(page: Page): void {
     future.value = []
     mode.value = 'edit'
     activePanel.value = 'pages'
+    closeSidebar()
 }
 
 function closeEditor(): void {
     mode.value = 'browse'
+    closeSidebar()
     selectedPage.value = null
     selectedBlock.value = null
 }
@@ -605,37 +623,76 @@ async function onTrashChanged(): Promise<void> {
 
 watch(activePanel, (panel) => {
     if (panel !== 'pages') mode.value = 'browse'
+    closeSidebar()
 })
 
-onMounted(load)
+function onAdminKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') closeSidebar()
+}
+
+onMounted(() => {
+    load()
+    window.addEventListener('keydown', onAdminKeydown)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', onAdminKeydown)
+})
 </script>
 
 <template>
-    <div class="bg-background text-foreground flex min-h-screen">
+    <div class="bg-background text-foreground flex min-h-screen flex-col md:flex-row">
         <Teleport to="body">
             <Toaster rich-colors position="top-right" close-button class="dc-admin-toaster" :visible-toasts="3" />
         </Teleport>
         <ActionToastHost />
 
+        <div
+            v-if="mode === 'browse' && sidebarOpen"
+            class="fixed inset-0 z-40 bg-black/45 md:hidden"
+            aria-hidden="true"
+            @click="closeSidebar"
+        />
+
+        <header
+            v-if="mode === 'browse'"
+            class="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b px-3 py-2.5 backdrop-blur md:hidden"
+        >
+            <Button variant="outline" size="icon-sm" aria-label="Open menu" @click="openSidebar">
+                <Menu class="size-4" />
+            </Button>
+            <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-semibold">{{ activePanelLabel }}</p>
+                <p class="text-muted-foreground truncate text-xs">DiamondCMS admin</p>
+            </div>
+            <img :src="brandLogo" alt="" class="size-7 shrink-0">
+        </header>
+
         <aside
             v-if="mode === 'browse'"
-            class="border-sidebar-border bg-sidebar text-sidebar-foreground flex w-64 shrink-0 flex-col border-r"
+            class="border-sidebar-border bg-sidebar text-sidebar-foreground fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r transition-transform duration-200 ease-out md:static md:z-auto md:w-64 md:shrink-0 md:translate-x-0"
+            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none md:pointer-events-auto md:translate-x-0'"
         >
-            <div class="flex items-center gap-2 px-4 py-5">
-                <img :src="brandLogo" alt="" class="size-7 shrink-0">
-                <div>
-                    <p class="font-semibold tracking-tight">DiamondCMS</p>
-                    <p class="text-muted-foreground text-xs">Website studio</p>
+            <div class="flex items-center justify-between gap-2 px-4 py-5">
+                <div class="flex min-w-0 items-center gap-2">
+                    <img :src="brandLogo" alt="" class="size-7 shrink-0">
+                    <div class="min-w-0">
+                        <p class="truncate font-semibold tracking-tight">DiamondCMS</p>
+                        <p class="text-muted-foreground truncate text-xs">Website studio</p>
+                    </div>
                 </div>
+                <Button variant="ghost" size="icon-sm" class="md:hidden" aria-label="Close menu" @click="closeSidebar">
+                    <X class="size-4" />
+                </Button>
             </div>
             <Separator />
-            <nav class="flex flex-1 flex-col gap-1 p-3">
+            <nav class="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
                 <Button
                     v-for="item in navItems"
                     :key="item.id"
                     :variant="activePanel === item.id ? 'secondary' : 'ghost'"
                     class="h-9 w-full justify-start gap-2 px-3"
-                    @click="activePanel = item.id"
+                    @click="navigateTo(item.id)"
                 >
                     <component :is="item.icon" class="size-4 shrink-0" />
                     <span>{{ item.label }}</span>
@@ -653,10 +710,10 @@ onMounted(load)
         </aside>
 
         <!-- Browse mode -->
-        <main v-if="mode === 'browse'" class="flex min-w-0 flex-1 flex-col gap-6 p-6">
+        <main v-if="mode === 'browse'" class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
             <section v-if="activePanel === 'dashboard'" class="space-y-6">
                 <div>
-                    <h1 class="text-3xl font-semibold tracking-tight">Welcome back</h1>
+                    <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Welcome back</h1>
                     <p class="text-muted-foreground mt-1 text-sm">Build and publish your personal site without touching code.</p>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -759,7 +816,7 @@ onMounted(load)
             <section v-else-if="activePanel === 'pages'" class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <div>
-                        <h1 class="text-3xl font-semibold tracking-tight">Pages</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Pages</h1>
                         <p class="text-muted-foreground text-sm">Open a page to edit it visually. The builder lives inside each page.</p>
                     </div>
                     <Button class="gap-2" @click="openNewPageDialog">
@@ -767,7 +824,7 @@ onMounted(load)
                         <span>New page</span>
                     </Button>
                 </div>
-                <Card>
+                <Card class="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -912,20 +969,20 @@ onMounted(load)
 
         <!-- Full page editor -->
         <div v-else class="flex min-h-screen min-w-0 flex-1 flex-col">
-            <header class="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 backdrop-blur">
+            <header class="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b px-3 py-2.5 backdrop-blur sm:gap-3 sm:px-4 sm:py-3">
                 <Button variant="ghost" size="sm" class="gap-1.5" @click="closeEditor">
                     <ArrowLeft class="size-4" />
-                    <span>Pages</span>
+                    <span class="hidden sm:inline">Pages</span>
                 </Button>
-                <Separator orientation="vertical" class="h-6" />
-                <Input v-model="pageTitle" class="h-9 max-w-sm font-medium" aria-label="Page title" />
-                <Badge variant="secondary">{{ selectedPage?.status ?? 'draft' }}</Badge>
-                <div class="ml-auto flex flex-wrap items-center gap-1.5">
-                    <Button size="sm" variant="outline" class="gap-1.5" @click="undo"><Undo2 class="size-4" /><span>Undo</span></Button>
-                    <Button size="sm" variant="outline" class="gap-1.5" @click="redo"><Redo2 class="size-4" /><span>Redo</span></Button>
+                <Separator orientation="vertical" class="hidden h-6 sm:block" />
+                <Input v-model="pageTitle" class="h-9 min-w-0 flex-1 font-medium sm:max-w-sm" aria-label="Page title" />
+                <Badge variant="secondary" class="shrink-0">{{ selectedPage?.status ?? 'draft' }}</Badge>
+                <div class="ml-auto flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto">
+                    <Button size="sm" variant="outline" class="gap-1.5" @click="undo"><Undo2 class="size-4" /><span class="hidden sm:inline">Undo</span></Button>
+                    <Button size="sm" variant="outline" class="gap-1.5" @click="redo"><Redo2 class="size-4" /><span class="hidden sm:inline">Redo</span></Button>
                     <Button size="sm" variant="outline" class="gap-1.5" :disabled="saving" @click="savePage()">
                         <Save class="size-4" />
-                        <span>Save draft</span>
+                        <span class="hidden sm:inline">Save draft</span>
                     </Button>
                     <Button
                         v-if="selectedPage?.status === 'published'"
@@ -935,7 +992,8 @@ onMounted(load)
                         :disabled="saving || pageActionBusy === selectedPage?.id"
                         @click="selectedPage && setPageStatus(selectedPage, 'draft', $event)"
                     >
-                        Unpublish
+                        <span class="sm:hidden">Unpub</span>
+                        <span class="hidden sm:inline">Unpublish</span>
                     </Button>
                     <Button
                         v-else
@@ -945,7 +1003,7 @@ onMounted(load)
                         @click="savePage('published')"
                     >
                         <Upload class="size-4" />
-                        <span>Publish</span>
+                        <span class="hidden sm:inline">Publish</span>
                     </Button>
                     <Button
                         size="sm"
@@ -955,16 +1013,16 @@ onMounted(load)
                         @click="selectedPage && deletePage(selectedPage, $event)"
                     >
                         <Trash2 class="size-4" />
-                        <span>Delete</span>
+                        <span class="hidden sm:inline">Delete</span>
                     </Button>
                     <Button size="sm" variant="outline" class="gap-1.5" @click="openPreview">
                         <ExternalLink class="size-4" />
-                        <span>Preview</span>
+                        <span class="hidden sm:inline">Preview</span>
                     </Button>
                     <Button size="sm" variant="secondary" class="gap-1.5" as-child>
                         <a :href="`/admin/live/${selectedPage?.id}`">
                             <Pencil class="size-4" />
-                            <span>Edit live</span>
+                            <span class="hidden sm:inline">Edit live</span>
                         </a>
                     </Button>
                 </div>
