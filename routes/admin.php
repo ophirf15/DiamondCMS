@@ -28,7 +28,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 Route::middleware(['auth', 'admin'])->group(function (): void {
     Route::get('/', fn () => redirect()->route('admin.dashboard'));
