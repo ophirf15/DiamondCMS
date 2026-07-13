@@ -44,10 +44,19 @@ final class DesignManager
                 'headerPadY' => '1.35rem',
                 'headerPadX' => '1.5rem',
             ],
-            'motion' => ['enabled' => true],
+            'motion' => [
+                'enabled' => true,
+                'level' => 'full',
+                'pageTransition' => 'fade',
+            ],
             'atmosphere' => [
                 'preset' => 'soft-teal',
                 'custom' => '',
+                'colorA' => '',
+                'colorB' => '',
+                'colorC' => '',
+                'animation' => 'aurora',
+                'intensity' => 'medium',
             ],
             'chrome' => [
                 'headerStyle' => 'classic',
@@ -343,7 +352,112 @@ final class DesignManager
             return $custom !== '' ? $custom : (string) $presets['solid']['css'];
         }
 
+        $tuned = self::atmosphereCssFromColors($preset, $atmosphere);
+        if ($tuned !== null) {
+            return $tuned;
+        }
+
         return (string) ($presets[$preset]['css'] ?? $presets['soft-teal']['css']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $atmosphere
+     */
+    public static function atmosphereCssFromColors(string $preset, array $atmosphere): ?string
+    {
+        $a = self::sanitizeHex((string) ($atmosphere['colorA'] ?? ''));
+        $b = self::sanitizeHex((string) ($atmosphere['colorB'] ?? ''));
+        // colorC is intentionally ignored for site background so light/dark tokens keep working.
+        // Tint washes use A/B; base always tracks --dc-bg / theme.
+        if ($a === null && $b === null) {
+            return null;
+        }
+
+        $a ??= 'var(--dc-primary)';
+        $b ??= 'var(--dc-accent)';
+
+        return match ($preset) {
+            'solid' => 'var(--dc-bg)',
+            'navy' => 'radial-gradient(circle at 20% 18%, color-mix(in srgb, '.$a.' 55%, var(--dc-bg)) 0%, var(--dc-bg) 46%, color-mix(in srgb, var(--dc-bg) 88%, #000) 100%)',
+            'midnight' => 'radial-gradient(ellipse 70% 50% at 50% -20%, color-mix(in srgb, '.$b.' 45%, '.$a.') 0%, var(--dc-bg) 58%)',
+            'split-teal' => 'linear-gradient(115deg, color-mix(in srgb, '.$a.' 55%, var(--dc-bg)) 0%, var(--dc-bg) 48%, color-mix(in srgb, '.$b.' 35%, var(--dc-bg)) 48%)',
+            default => 'radial-gradient(ellipse 80% 50% at 0% -10%, color-mix(in srgb, '.$a.' 28%, transparent), transparent 55%), radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, '.$b.' 18%, transparent), transparent 50%), linear-gradient(165deg, var(--dc-bg), color-mix(in srgb, var(--dc-bg) 88%, '.$a.') 100%)',
+        };
+    }
+
+    /** @return array<string, array{label: string, colorA: string, colorB: string, colorC: string}> */
+    public static function atmosphereColorCombos(): array
+    {
+        return [
+            'teal-gold' => ['label' => 'Teal & gold', 'colorA' => '#0d5c4d', 'colorB' => '#a67c3d', 'colorC' => ''],
+            'ocean' => ['label' => 'Ocean blue', 'colorA' => '#0369a1', 'colorB' => '#22d3ee', 'colorC' => ''],
+            'sunset' => ['label' => 'Sunset', 'colorA' => '#ea580c', 'colorB' => '#f59e0b', 'colorC' => ''],
+            'violet' => ['label' => 'Violet dusk', 'colorA' => '#7c3aed', 'colorB' => '#e879f9', 'colorC' => ''],
+            'forest' => ['label' => 'Forest', 'colorA' => '#166534', 'colorB' => '#84cc16', 'colorC' => ''],
+            'rose' => ['label' => 'Rose mist', 'colorA' => '#be123c', 'colorB' => '#fb7185', 'colorC' => ''],
+            'mono' => ['label' => 'Monochrome', 'colorA' => '#525252', 'colorB' => '#a3a3a3', 'colorC' => ''],
+            'aurora' => ['label' => 'Aurora', 'colorA' => '#14b8a6', 'colorB' => '#818cf8', 'colorC' => ''],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function motion(): array
+    {
+        $motion = self::tokens()['motion'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['motion'], is_array($motion) ? $motion : []);
+    }
+
+    /** @return array<string, mixed> */
+    public static function atmosphere(): array
+    {
+        $atmosphere = self::tokens()['atmosphere'] ?? [];
+
+        return array_replace_recursive(self::defaultTokens()['atmosphere'], is_array($atmosphere) ? $atmosphere : []);
+    }
+
+    public static function motionLevel(): string
+    {
+        $motion = self::motion();
+        if (! (bool) ($motion['enabled'] ?? true)) {
+            return 'off';
+        }
+        $level = (string) ($motion['level'] ?? 'full');
+
+        return in_array($level, ['off', 'reduced', 'full'], true) ? $level : 'full';
+    }
+
+    public static function motionAttr(string $key, array $allowed, string $fallback): string
+    {
+        $value = (string) (self::motion()[$key] ?? $fallback);
+
+        return in_array($value, $allowed, true) ? $value : $fallback;
+    }
+
+    public static function atmosphereAttr(string $key, array $allowed, string $fallback): string
+    {
+        $value = (string) (self::atmosphere()[$key] ?? $fallback);
+        $aliases = [
+            'drift' => 'aurora',
+            'orbs' => 'mesh',
+            'grain' => 'particles',
+        ];
+        $value = $aliases[$value] ?? $value;
+
+        return in_array($value, $allowed, true) ? $value : $fallback;
+    }
+
+    private static function sanitizeHex(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        if (preg_match('/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/', $value) === 1) {
+            return strtolower($value);
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $tokens */
@@ -486,6 +600,27 @@ final class DesignManager
             .'--dc-project-logo-max-width:'.$logoMaxW.';'
             .'--dc-project-cta-size:'.$ctaSize.';';
 
+        $motion = self::motion();
+        $atmosphere = self::atmosphere();
+        $parallaxStrength = match ((string) ($motion['parallax'] ?? 'light')) {
+            'strong' => '0.08',
+            'off' => '0',
+            default => '0.04',
+        };
+        $shared .= '--dc-motion-parallax:'.$parallaxStrength.';'
+            .'--dc-atmosphere-intensity:'.match ((string) ($atmosphere['intensity'] ?? 'medium')) {
+                'low' => '0.55',
+                'high' => '1',
+                default => '0.78',
+            }.';';
+
+        $atmA = self::sanitizeHex((string) ($atmosphere['colorA'] ?? ''));
+        $atmB = self::sanitizeHex((string) ($atmosphere['colorB'] ?? ''));
+        $atmC = self::sanitizeHex((string) ($atmosphere['colorC'] ?? ''));
+        $shared .= '--dc-atmosphere-a:'.($atmA ?? 'var(--dc-primary)').';'
+            .'--dc-atmosphere-b:'.($atmB ?? 'var(--dc-accent)').';'
+            .'--dc-atmosphere-c:'.($atmC ?? 'var(--dc-bg)').';';
+
         $rootVars = match ($mode) {
             'dark' => $darkVars.$shared,
             'light' => $lightVars.$shared,
@@ -510,10 +645,13 @@ final class DesignManager
         }
 
         if (! self::motionEnabled()) {
-            $css .= 'html[data-dc-motion="off"] [data-dc-animate],html[data-dc-motion="off"] .dc-reveal{animation:none!important;opacity:1!important;transform:none!important}';
+            $css .= 'html[data-dc-motion="off"] [data-dc-animate],html[data-dc-motion="off"] .dc-reveal,body[data-dc-motion-level="off"] [data-dc-animate]{animation:none!important;opacity:1!important;transform:none!important}';
+            $css .= 'body[data-dc-motion-level="off"] .dc-atmosphere-layer{display:none!important}';
+        } elseif (self::motionReduced()) {
+            $css .= 'body[data-dc-motion-level="reduced"] .dc-atmosphere-canvas{opacity:0.45!important}';
         }
 
-        $css .= '@media (prefers-reduced-motion: reduce){*,::before,::after{animation:none!important;transition:none!important}}';
+        $css .= '@media (prefers-reduced-motion: reduce){.dc-atmosphere-layer::before{animation:none!important}.dc-atmosphere-canvas,.dc-page-transition{display:none!important}}';
 
         return new HtmlString('<style id="diamondcms-design-tokens">'.$css.'</style>');
     }
@@ -704,9 +842,12 @@ final class DesignManager
 
     public static function motionEnabled(): bool
     {
-        $motion = self::tokens()['motion'] ?? [];
+        return self::motionLevel() !== 'off';
+    }
 
-        return (bool) ($motion['enabled'] ?? true);
+    public static function motionReduced(): bool
+    {
+        return self::motionLevel() === 'reduced';
     }
 
     /** @param array<string, mixed> $colors @param array<string, string> $defaults */

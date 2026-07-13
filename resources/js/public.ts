@@ -1,9 +1,12 @@
+import { initAtmosphere } from './atmosphere'
+
 export function prefersReducedMotion(): boolean {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 export function motionEnabled(): boolean {
     if (document.body.dataset.dcMotion === 'off') return false
+    if (document.body.dataset.dcMotionLevel === 'off') return false
     if (prefersReducedMotion()) return false
     return true
 }
@@ -46,6 +49,45 @@ export function bindParallax(): void {
 
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
+}
+
+export function initPageTransitions(): void {
+    if (!motionEnabled()) return
+    const mode = document.body.dataset.dcPageTransition || 'fade'
+    if (mode === 'off') return
+
+    const veil = document.querySelector<HTMLElement>('.dc-page-transition')
+    if (!veil) return
+
+    // Never capture clicks while idle — only paint during navigation.
+    veil.style.pointerEvents = 'none'
+
+    document.addEventListener('click', (event) => {
+        const target = event.target
+        if (!(target instanceof Element)) return
+        const link = target.closest('a')
+        if (!(link instanceof HTMLAnchorElement)) return
+        if (link.target === '_blank' || link.hasAttribute('download')) return
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        const href = link.getAttribute('href')
+        if (!href || href.startsWith('#')) return
+
+        let url: URL
+        try {
+            url = new URL(link.href, window.location.href)
+        } catch {
+            return
+        }
+        if (url.origin !== window.location.origin) return
+        if (url.pathname === window.location.pathname && url.search === window.location.search) return
+        if (link.closest('[data-dc-nav-toggle], .dc-lightbox, .dc-live-edit-fab')) return
+
+        event.preventDefault()
+        veil.classList.add('is-active')
+        window.setTimeout(() => {
+            window.location.href = url.href
+        }, mode === 'slide' ? 280 : 220)
+    })
 }
 
 const THEME_KEY = 'diamondcms.theme'
@@ -302,8 +344,10 @@ export function initMobileNav(): void {
 
 export function initPublicSite(): void {
     initThemeToggle()
+    initAtmosphere()
     observeReveals()
     bindParallax()
+    initPageTransitions()
     initLightbox()
     initGalleryCarousels()
     initResumeDownloads()

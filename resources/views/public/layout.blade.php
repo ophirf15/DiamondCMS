@@ -38,10 +38,15 @@
     $resumeDensity = \App\Domains\Design\Support\DesignManager::resumeAttr('density', \App\Domains\Design\Support\DesignManager::resumeDensities(), 'comfortable');
     $resumeRhythm = \App\Domains\Design\Support\DesignManager::resumeAttr('sectionRhythm', \App\Domains\Design\Support\DesignManager::resumeSectionRhythms(), 'relaxed');
     $resumeExperience = \App\Domains\Design\Support\DesignManager::resumeAttr('experienceStyle', \App\Domains\Design\Support\DesignManager::resumeExperienceStyles(), 'stacked');
+    $motionLevel = \App\Domains\Design\Support\DesignManager::motionLevel();
 @endphp
 <body
     class="dc-site {{ $shell === 'sidebar-dark' ? 'dc-shell-sidebar-dark' : 'dc-shell-default' }} dc-header-{{ $headerStyle }} dc-footer-{{ $footerStyle }} dc-btn-{{ $buttonStyle }} dc-surface-{{ $surface }}"
-    data-dc-motion="{{ \App\Domains\Design\Support\DesignManager::motionEnabled() ? 'on' : 'off' }}"
+    data-dc-motion="{{ $motionLevel === 'off' ? 'off' : 'on' }}"
+    data-dc-motion-level="{{ $motionLevel }}"
+    data-dc-atmosphere-anim="{{ \App\Domains\Design\Support\DesignManager::atmosphereAttr('animation', ['none', 'aurora', 'mesh', 'particles', 'waves', 'fog', 'drift', 'orbs', 'grain'], 'aurora') }}"
+    data-dc-atmosphere-intensity="{{ \App\Domains\Design\Support\DesignManager::atmosphereAttr('intensity', ['low', 'medium', 'high'], 'medium') }}"
+    data-dc-page-transition="{{ \App\Domains\Design\Support\DesignManager::motionAttr('pageTransition', ['off', 'fade', 'slide'], 'fade') }}"
     data-dc-button="{{ $buttonStyle }}"
     data-dc-surface="{{ $surface }}"
     data-dc-density="{{ $uiKit['density'] ?? 'comfortable' }}"
@@ -54,11 +59,13 @@
     data-dc-theme-lock="{{ $themeLocked ? '1' : '0' }}"
     data-dc-theme-toggle="{{ $visitorToggle ? '1' : '0' }}"
 >
+    <div class="dc-atmosphere-layer" aria-hidden="true"></div>
+    <div class="dc-page-transition" aria-hidden="true"></div>
     <a class="skip-link" href="#content">Skip to content</a>
 
     @if ($shell === 'sidebar-dark')
         <div class="dc-sidebar-shell">
-            <aside class="dc-sidebar-rail" data-dc-animate="rise" data-dc-nav-root>
+            <aside class="dc-sidebar-rail" data-dc-nav-root>
                 <a class="dc-sidebar-brand" href="{{ route('home') }}">
                     <img src="{{ diamondcms_logo_url() }}" alt="" class="dc-sidebar-photo">
                     <strong>{{ diamondcms_site_name() }}</strong>

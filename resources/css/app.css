@@ -129,6 +129,108 @@ a:hover {
     background: var(--dc-site-bg, var(--dc-bg));
     background-attachment: fixed;
     color: var(--dc-fg);
+    position: relative;
+}
+
+/* Ambient FX only — fixed, non-interactive, never clips document scroll */
+.dc-atmosphere-layer {
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: fixed;
+    z-index: 0;
+}
+
+.dc-atmosphere-layer::before {
+    animation: dc-atmosphere-breathe 18s ease-in-out infinite alternate;
+    background:
+        radial-gradient(ellipse 60% 45% at 12% 10%, color-mix(in srgb, var(--dc-atmosphere-a, var(--dc-primary)) 36%, transparent), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 88% 16%, color-mix(in srgb, var(--dc-atmosphere-b, var(--dc-accent)) 30%, transparent), transparent 68%),
+        radial-gradient(ellipse 45% 35% at 48% 92%, color-mix(in srgb, var(--dc-atmosphere-a, var(--dc-primary)) 16%, transparent), transparent 70%);
+    content: '';
+    filter: blur(28px);
+    inset: -12%;
+    opacity: calc(var(--dc-atmosphere-intensity, 0.78) * 0.75);
+    pointer-events: none;
+    position: absolute;
+    will-change: transform;
+}
+
+/* Soft CSS wash only for static mode — canvas owns motion for the animated presets */
+body[data-dc-atmosphere-anim='aurora'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='mesh'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='fog'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='drift'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='orbs'] .dc-atmosphere-layer::before {
+    animation: none;
+    opacity: 0.12;
+}
+
+body[data-dc-atmosphere-anim='particles'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='waves'] .dc-atmosphere-layer::before,
+body[data-dc-atmosphere-anim='grain'] .dc-atmosphere-layer::before {
+    animation: none;
+    opacity: 0.2;
+}
+
+.dc-atmosphere-canvas {
+    display: block;
+    height: 100%;
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: 100%;
+}
+
+body[data-dc-atmosphere-anim='none'] .dc-atmosphere-layer::before {
+    animation: none;
+}
+
+body[data-dc-atmosphere-anim='none'] .dc-atmosphere-canvas {
+    display: none;
+}
+
+body[data-dc-motion-level='off'] .dc-atmosphere-layer,
+html[data-dc-motion='off'] .dc-atmosphere-layer {
+    display: none;
+}
+
+@keyframes dc-atmosphere-breathe {
+    from { transform: translate3d(-1%, 0, 0) scale(1.02); }
+    to { transform: translate3d(1.2%, -0.8%, 0) scale(1.06); }
+}
+
+.dc-page-transition {
+    background: color-mix(in srgb, var(--dc-bg) 88%, var(--dc-primary));
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: fixed;
+    transform: translateY(0);
+    transition: opacity 0.28s ease, transform 0.35s ease;
+    z-index: 90;
+}
+
+.dc-page-transition.is-active {
+    opacity: 1;
+}
+
+body[data-dc-page-transition='slide'] .dc-page-transition {
+    transform: translateY(10%);
+}
+
+body[data-dc-page-transition='slide'] .dc-page-transition.is-active {
+    transform: translateY(0);
+}
+
+.dc-site > main,
+.dc-site > header,
+.dc-site > footer,
+.dc-site > .dc-sidebar-shell,
+.dc-site > a.skip-link {
+    position: relative;
+    z-index: 1;
 }
 
 .dc-site > main {
@@ -2471,8 +2573,14 @@ html[data-dc-surface="soft"] .dc-project-cta.dc-button {
 }
 
 .honeypot {
-    left: -100vw;
+    height: 0;
+    left: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
     position: absolute;
+    top: 0;
+    width: 0;
 }
 
 .dc-action-toast-layer {

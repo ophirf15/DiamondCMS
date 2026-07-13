@@ -17,7 +17,26 @@ type DesignTokens = {
     typography: { body: string, heading: string, scale: number }
     branding: { logo: string | null, alternateLogo: string | null, favicon: string | null }
     spacing?: { container: string, radius: string, headerPadY?: string, headerPadX?: string }
-    atmosphere?: { preset: string, custom: string }
+    atmosphere?: {
+        preset: string
+        custom: string
+        colorA?: string
+        colorB?: string
+        colorC?: string
+        animation?: string
+        intensity?: string
+    }
+    motion?: {
+        enabled?: boolean
+        level?: string
+        reveal?: string
+        parallax?: string
+        parallaxMobile?: boolean
+        hover?: string
+        pageTransition?: string
+        smoothScroll?: boolean
+        scrollProgress?: boolean
+    }
     chrome?: {
         headerStyle: string
         mobileNav?: string
@@ -77,7 +96,7 @@ type StylePreset = {
 }
 
 type ActiveTab = 'overall' | 'portfolio' | 'resume'
-type OverallSection = 'chrome' | 'look' | 'uikit'
+type OverallSection = 'chrome' | 'look' | 'uikit' | 'motion'
 type PortfolioPreviewMode = 'detail' | 'index'
 
 const props = defineProps<{
@@ -259,6 +278,45 @@ const overallSections: { key: OverallSection, label: string }[] = [
     { key: 'chrome', label: 'Chrome' },
     { key: 'look', label: 'Look & type' },
     { key: 'uikit', label: 'UI kit' },
+    { key: 'motion', label: 'Atmosphere' },
+]
+
+const atmosphereColorCombos = [
+    { key: 'teal-gold', label: 'Teal & gold', colorA: '#0d5c4d', colorB: '#a67c3d', colorC: '' },
+    { key: 'ocean', label: 'Ocean blue', colorA: '#0369a1', colorB: '#22d3ee', colorC: '' },
+    { key: 'sunset', label: 'Sunset', colorA: '#ea580c', colorB: '#f59e0b', colorC: '' },
+    { key: 'violet', label: 'Violet dusk', colorA: '#7c3aed', colorB: '#e879f9', colorC: '' },
+    { key: 'forest', label: 'Forest', colorA: '#166534', colorB: '#84cc16', colorC: '' },
+    { key: 'rose', label: 'Rose mist', colorA: '#be123c', colorB: '#fb7185', colorC: '' },
+    { key: 'mono', label: 'Monochrome', colorA: '#525252', colorB: '#a3a3a3', colorC: '' },
+    { key: 'aurora', label: 'Aurora', colorA: '#14b8a6', colorB: '#818cf8', colorC: '' },
+]
+
+const motionLevels: StylePreset[] = [
+    { key: 'full', label: 'Full', description: 'Ambient backgrounds on' },
+    { key: 'reduced', label: 'Reduced', description: 'Softer atmosphere' },
+    { key: 'off', label: 'Off', description: 'No ambient motion' },
+]
+
+const pageTransitionStyles: StylePreset[] = [
+    { key: 'fade', label: 'Fade', description: 'Quick fade between pages' },
+    { key: 'slide', label: 'Slide', description: 'Soft vertical wipe' },
+    { key: 'off', label: 'Off', description: 'Instant navigation' },
+]
+
+const atmosphereAnimations: StylePreset[] = [
+    { key: 'aurora', label: 'Aurora', description: 'Soft drifting color washes' },
+    { key: 'mesh', label: 'Mesh', description: 'Animated gradient mesh' },
+    { key: 'particles', label: 'Particles', description: 'Floating light points' },
+    { key: 'waves', label: 'Waves', description: 'Slow sine bands' },
+    { key: 'fog', label: 'Fog', description: 'Diffuse mist clouds' },
+    { key: 'none', label: 'Static', description: 'Theme background only' },
+]
+
+const atmosphereIntensities: StylePreset[] = [
+    { key: 'low', label: 'Low', description: 'Quiet ambience' },
+    { key: 'medium', label: 'Medium', description: 'Balanced' },
+    { key: 'high', label: 'High', description: 'More visible motion' },
 ]
 
 const sampleSocials: SocialLinkItem[] = [
@@ -389,7 +447,34 @@ function ensureChrome(tokensValue: DesignTokens): void {
         tokensValue.themeControl = { allowVisitorToggle: true, lockMode: false }
     }
     if (!tokensValue.atmosphere) {
-        tokensValue.atmosphere = { preset: 'soft-teal', custom: '' }
+        tokensValue.atmosphere = {
+            preset: 'soft-teal',
+            custom: '',
+            colorA: '',
+            colorB: '',
+            colorC: '',
+            animation: 'aurora',
+            intensity: 'medium',
+        }
+    } else {
+        tokensValue.atmosphere.colorA ??= ''
+        tokensValue.atmosphere.colorB ??= ''
+        tokensValue.atmosphere.colorC ??= ''
+        const legacyAnim: Record<string, string> = { drift: 'aurora', orbs: 'mesh', grain: 'particles' }
+        const anim = tokensValue.atmosphere.animation || 'aurora'
+        tokensValue.atmosphere.animation = legacyAnim[anim] || anim
+        tokensValue.atmosphere.intensity ??= 'medium'
+    }
+    if (!tokensValue.motion) {
+        tokensValue.motion = {
+            enabled: true,
+            level: 'full',
+            pageTransition: 'fade',
+        }
+    } else {
+        tokensValue.motion.enabled ??= true
+        tokensValue.motion.level ??= tokensValue.motion.enabled === false ? 'off' : 'full'
+        tokensValue.motion.pageTransition ??= 'fade'
     }
     if (!tokensValue.spacing) {
         tokensValue.spacing = { container: '1120px', radius: '0.4rem', headerPadY: '1.35rem', headerPadX: '1.5rem' }
@@ -442,11 +527,8 @@ const previewRadius = computed(() => {
 const previewStyle = computed(() => {
     if (!tokens.value) return {}
     const palette = tokens.value.mode === 'dark' ? tokens.value.dark : tokens.value.colors
-    const preset = tokens.value.atmosphere?.preset || 'soft-teal'
-    const atmosphere = atmospherePresets.find((row) => row.key === preset)
-    let background = atmosphere?.preview || palette.background
-    if (preset === 'solid') background = palette.background
-    if (preset === 'custom' && tokens.value.atmosphere?.custom) background = tokens.value.atmosphere.custom
+    const tuned = atmospherePreviewStyle()
+    let background = tuned.background || palette.background
 
     return {
         background,
@@ -555,21 +637,99 @@ function applyFont(preset: typeof fontPresets[number]): void {
 function applyAtmosphere(key: string): void {
     if (!tokens.value) return
     if (!tokens.value.atmosphere) {
-        tokens.value.atmosphere = { preset: key, custom: '' }
+        tokens.value.atmosphere = {
+            preset: key,
+            custom: '',
+            colorA: '',
+            colorB: '',
+            colorC: '',
+            animation: 'aurora',
+            intensity: 'medium',
+        }
     } else {
         tokens.value.atmosphere.preset = key
     }
 
+    // Presets stay theme-token based — do not lock light/dark here.
+    // Optional dark palettes can still be chosen under Look & type.
     if (key === 'navy') {
-        tokens.value.mode = 'dark'
         tokens.value.dark = { ...tokens.value.dark, ...navyDark }
     } else if (key === 'midnight') {
-        tokens.value.mode = 'dark'
         tokens.value.dark = { ...tokens.value.dark, ...midnightDark }
     } else if (key === 'split-teal') {
-        tokens.value.mode = 'dark'
         tokens.value.dark = { ...tokens.value.dark, ...splitTealDark }
     }
+}
+
+function applyAtmosphereCombo(combo: typeof atmosphereColorCombos[number]): void {
+    if (!tokens.value?.atmosphere) return
+    tokens.value.atmosphere.colorA = combo.colorA
+    tokens.value.atmosphere.colorB = combo.colorB
+    // Keep base background theme-aware (light/dark). Combos only tint the washes.
+    tokens.value.atmosphere.colorC = ''
+}
+
+function resetAtmosphereColors(): void {
+    if (!tokens.value?.atmosphere) return
+    tokens.value.atmosphere.colorA = ''
+    tokens.value.atmosphere.colorB = ''
+    tokens.value.atmosphere.colorC = ''
+    tokens.value.atmosphere.custom = ''
+}
+
+function resetMotionDefaults(): void {
+    if (!tokens.value) return
+    tokens.value.motion = {
+        enabled: true,
+        level: 'full',
+        pageTransition: 'fade',
+    }
+    tokens.value.atmosphere = {
+        preset: 'soft-teal',
+        custom: '',
+        colorA: '',
+        colorB: '',
+        colorC: '',
+        animation: 'aurora',
+        intensity: 'medium',
+    }
+}
+
+function atmospherePreviewStyle(): Record<string, string> {
+    if (!tokens.value?.atmosphere) return {}
+    const atm = tokens.value.atmosphere
+    const palette = tokens.value.mode === 'dark' ? tokens.value.dark : tokens.value.colors
+    const a = atm.colorA || palette.primary || '#0d5c4d'
+    const b = atm.colorB || palette.accent || '#a67c3d'
+    const base = palette.background || '#e4e9e5'
+    if (atm.preset === 'custom' && atm.custom) {
+        return { background: atm.custom }
+    }
+    if (atm.preset === 'solid') {
+        return { background: base }
+    }
+    if (atm.colorA || atm.colorB) {
+        if (atm.preset === 'navy') {
+            return { background: `radial-gradient(circle at 20% 18%, ${a} 0%, ${base} 46%, ${base} 100%)` }
+        }
+        if (atm.preset === 'midnight') {
+            return { background: `radial-gradient(ellipse 70% 50% at 50% -20%, ${b} 0%, ${base} 58%)` }
+        }
+        if (atm.preset === 'split-teal') {
+            return { background: `linear-gradient(115deg, ${a} 0%, ${base} 48%, ${b} 48%)` }
+        }
+        return {
+            background: `radial-gradient(ellipse 80% 50% at 0% -10%, ${a}55, transparent 55%), radial-gradient(ellipse 60% 40% at 100% 0%, ${b}40, transparent 50%), linear-gradient(165deg, ${base}, ${base})`,
+        }
+    }
+    const preset = atmospherePresets.find((row) => row.key === atm.preset)
+    return { background: preset?.preview || base }
+}
+
+function setMotionLevel(level: string): void {
+    if (!tokens.value?.motion) return
+    tokens.value.motion.level = level
+    tokens.value.motion.enabled = level !== 'off'
 }
 
 function onLockChange(): void {
@@ -629,40 +789,8 @@ onMounted(load)
                     <template v-if="overallSection === 'chrome'">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Page atmosphere</CardTitle>
-                                <CardDescription>
-                                    Background look for the public site. Pick <strong>Navy AI gradient</strong> to match the Dark applied-AI hero template.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent class="space-y-4">
-                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    <button
-                                        v-for="preset in atmospherePresets"
-                                        :key="preset.key"
-                                        type="button"
-                                        class="hover:border-primary overflow-hidden rounded-xl border text-left transition"
-                                        :class="tokens.atmosphere?.preset === preset.key ? 'border-primary ring-primary/30 ring-2' : ''"
-                                        @click="applyAtmosphere(preset.key)"
-                                    >
-                                        <div class="h-16 w-full" :style="{ background: preset.preview }" />
-                                        <div class="px-3 py-2 text-sm font-medium">{{ preset.label }}</div>
-                                    </button>
-                                </div>
-                                <div v-if="tokens.atmosphere?.preset === 'custom'" class="space-y-2">
-                                    <Label for="custom-bg">Custom background CSS</Label>
-                                    <Input
-                                        id="custom-bg"
-                                        v-model="tokens.atmosphere.custom"
-                                        placeholder="radial-gradient(circle at 20% 20%, #12325a, #050a15)"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
                                 <CardTitle>Header style</CardTitle>
-                                <CardDescription>Pick a top menu layout. Link labels are edited under Menus.</CardDescription>
+                                <CardDescription>Pick a top menu layout. Link labels are edited under Menus. Ambient backgrounds live under the Atmosphere tab.</CardDescription>
                             </CardHeader>
                             <CardContent class="space-y-5">
                                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -992,7 +1120,7 @@ onMounted(load)
                     </template>
 
                     <!-- Overall / UI kit -->
-                    <template v-else>
+                    <template v-else-if="overallSection === 'uikit'">
                         <Card>
                             <CardHeader>
                                 <CardTitle>UI kit (HeroUI-inspired)</CardTitle>
@@ -1085,6 +1213,171 @@ onMounted(load)
                                             <div class="text-muted-foreground text-xs">{{ style.description }}</div>
                                         </button>
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </template>
+
+                    <!-- Overall / Atmosphere -->
+                    <template v-else-if="overallSection === 'motion'">
+                        <Card>
+                            <CardHeader class="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+                                <div class="space-y-1.5">
+                                    <CardTitle>Ambient backgrounds</CardTitle>
+                                    <CardDescription>
+                                        Vanta / Aceternity-style motion stays in a fixed canvas behind the page — it never moves content or blocks scrolling.
+                                    </CardDescription>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" @click="resetMotionDefaults">Reset all to defaults</Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div class="grid gap-2 sm:grid-cols-3">
+                                    <button
+                                        v-for="style in motionLevels"
+                                        :key="style.key"
+                                        type="button"
+                                        class="hover:border-primary rounded-xl border p-3 text-left transition"
+                                        :class="tokens.motion?.level === style.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                        @click="setMotionLevel(style.key)"
+                                    >
+                                        <div class="text-sm font-medium">{{ style.label }}</div>
+                                        <div class="text-muted-foreground text-xs">{{ style.description }}</div>
+                                    </button>
+                                </div>
+                                <div class="mt-5">
+                                    <p class="mb-2 text-sm font-medium">Page transition</p>
+                                    <div class="grid gap-2 sm:grid-cols-3">
+                                        <button
+                                            v-for="style in pageTransitionStyles"
+                                            :key="style.key"
+                                            type="button"
+                                            class="hover:border-primary rounded-xl border p-3 text-left transition"
+                                            :class="tokens.motion?.pageTransition === style.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                            @click="tokens.motion && (tokens.motion.pageTransition = style.key)"
+                                        >
+                                            <div class="text-sm font-medium">{{ style.label }}</div>
+                                            <div class="text-muted-foreground text-xs">{{ style.description }}</div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Page atmosphere</CardTitle>
+                                <CardDescription>Pick a background shape, an ambient effect, then tune colors or grab a combo.</CardDescription>
+                            </CardHeader>
+                            <CardContent class="space-y-5">
+                                <div
+                                    class="h-24 w-full overflow-hidden rounded-xl border"
+                                    :style="atmospherePreviewStyle()"
+                                />
+                                <div>
+                                    <p class="mb-2 text-sm font-medium">Ambient effect</p>
+                                    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                        <button
+                                            v-for="style in atmosphereAnimations"
+                                            :key="style.key"
+                                            type="button"
+                                            class="hover:border-primary rounded-xl border p-3 text-left transition"
+                                            :class="tokens.atmosphere?.animation === style.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                            @click="tokens.atmosphere && (tokens.atmosphere.animation = style.key)"
+                                        >
+                                            <div class="text-sm font-medium">{{ style.label }}</div>
+                                            <div class="text-muted-foreground text-xs">{{ style.description }}</div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="mb-2 text-sm font-medium">Intensity</p>
+                                    <div class="grid gap-2 sm:grid-cols-3">
+                                        <button
+                                            v-for="style in atmosphereIntensities"
+                                            :key="style.key"
+                                            type="button"
+                                            class="hover:border-primary rounded-xl border p-3 text-left transition"
+                                            :class="tokens.atmosphere?.intensity === style.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                            @click="tokens.atmosphere && (tokens.atmosphere.intensity = style.key)"
+                                        >
+                                            <div class="text-sm font-medium">{{ style.label }}</div>
+                                            <div class="text-muted-foreground text-xs">{{ style.description }}</div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    <button
+                                        v-for="preset in atmospherePresets"
+                                        :key="preset.key"
+                                        type="button"
+                                        class="hover:border-primary overflow-hidden rounded-xl border text-left transition"
+                                        :class="tokens.atmosphere?.preset === preset.key ? 'border-primary ring-primary/30 ring-2' : ''"
+                                        @click="applyAtmosphere(preset.key)"
+                                    >
+                                        <div class="h-16 w-full" :style="{ background: preset.preview }" />
+                                        <div class="px-3 py-2 text-sm font-medium">{{ preset.label }}</div>
+                                    </button>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <p class="text-sm font-medium">Gradient colors</p>
+                                        <Button type="button" variant="outline" size="sm" @click="resetAtmosphereColors">Reset colors to default</Button>
+                                    </div>
+                                    <p class="text-muted-foreground text-xs">Empty colors use the live theme palette (so light/dark keep working). Color A/B tint the washes — base stays on the theme background.</p>
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div class="space-y-2">
+                                            <Label for="atm-color-a">Color A</Label>
+                                            <div class="flex gap-2">
+                                                <Input
+                                                    id="atm-color-a"
+                                                    :model-value="tokens.atmosphere!.colorA || '#0d5c4d'"
+                                                    type="color"
+                                                    class="h-9 w-14 p-1"
+                                                    @update:model-value="tokens.atmosphere!.colorA = String($event)"
+                                                />
+                                                <Input v-model="tokens.atmosphere!.colorA" placeholder="#0d5c4d" />
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <Label for="atm-color-b">Color B</Label>
+                                            <div class="flex gap-2">
+                                                <Input
+                                                    id="atm-color-b"
+                                                    :model-value="tokens.atmosphere!.colorB || '#a67c3d'"
+                                                    type="color"
+                                                    class="h-9 w-14 p-1"
+                                                    @update:model-value="tokens.atmosphere!.colorB = String($event)"
+                                                />
+                                                <Input v-model="tokens.atmosphere!.colorB" placeholder="#a67c3d" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="mb-2 text-sm font-medium">Nice combos</p>
+                                        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                            <button
+                                                v-for="combo in atmosphereColorCombos"
+                                                :key="combo.key"
+                                                type="button"
+                                                class="hover:border-primary overflow-hidden rounded-xl border text-left transition"
+                                                @click="applyAtmosphereCombo(combo)"
+                                            >
+                                                <div
+                                                    class="h-10 w-full"
+                                                    :style="{ background: `linear-gradient(120deg, ${combo.colorA}, ${combo.colorB})` }"
+                                                />
+                                                <div class="px-2 py-1.5 text-xs font-medium">{{ combo.label }}</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-if="tokens.atmosphere?.preset === 'custom'" class="space-y-2">
+                                    <Label for="custom-bg">Custom background CSS</Label>
+                                    <Input
+                                        id="custom-bg"
+                                        v-model="tokens.atmosphere.custom"
+                                        placeholder="radial-gradient(circle at 20% 20%, #12325a, #050a15)"
+                                    />
                                 </div>
                             </CardContent>
                         </Card>

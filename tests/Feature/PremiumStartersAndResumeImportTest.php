@@ -282,6 +282,37 @@ TXT);
         $this->assertStringContainsString('var(--dc-primary)', $css);
     }
 
+    public function test_atmosphere_color_pickers_override_preset_css(): void
+    {
+        DesignManager::saveTokens([
+            'atmosphere' => [
+                'preset' => 'soft-teal',
+                'custom' => '',
+                'colorA' => '#0369a1',
+                'colorB' => '#22d3ee',
+                'colorC' => '#0f172a',
+                'animation' => 'aurora',
+                'intensity' => 'high',
+            ],
+            'motion' => [
+                'level' => 'reduced',
+            ],
+        ]);
+
+        $cssBg = DesignManager::atmosphereCss();
+        $this->assertStringContainsString('#0369a1', $cssBg);
+        $this->assertStringContainsString('#22d3ee', $cssBg);
+        // Base stays theme-aware so light/dark keep working.
+        $this->assertStringContainsString('var(--dc-bg)', $cssBg);
+        $this->assertStringNotContainsString('#0f172a', $cssBg);
+
+        $css = DesignManager::cssVariables()->toHtml();
+        $this->assertStringContainsString('--dc-atmosphere-intensity:1', $css);
+        $this->assertSame('reduced', DesignManager::motionLevel());
+        $this->assertTrue(DesignManager::motionReduced());
+        $this->assertSame('aurora', DesignManager::atmosphereAttr('animation', ['none', 'aurora', 'mesh', 'particles', 'waves', 'fog'], 'aurora'));
+    }
+
     public function test_public_resume_uses_theme_layout_and_grouped_sections(): void
     {
         DesignManager::saveTokens([
