@@ -1454,7 +1454,15 @@ onMounted(load)
                                     'text-center': tokens.chrome?.footerStyle === 'centered',
                                 }"
                             >
-                                <div v-if="tokens.chrome?.footerStyle !== 'minimal'" class="mb-1 flex items-center gap-2" :class="tokens.chrome?.footerStyle === 'centered' ? 'justify-center' : ''">
+                                <div
+                                    v-if="tokens.chrome?.footerStyle !== 'minimal'"
+                                    class="flex items-center gap-2"
+                                    :class="{
+                                        'mb-1': tokens.chrome?.footerStyle !== 'split',
+                                        'mr-auto': tokens.chrome?.footerStyle === 'split',
+                                        'justify-center': tokens.chrome?.footerStyle === 'centered',
+                                    }"
+                                >
                                     <img
                                         v-if="tokens.chrome?.footerShowLogo"
                                         :src="tokens.branding.logo || '/brand/logo-primary-gold.svg'"
@@ -1467,8 +1475,16 @@ onMounted(load)
                                     <span>Privacy</span>
                                     <span>Contact</span>
                                 </div>
-                                <p v-if="tokens.chrome?.footerTagline" class="mt-1 opacity-60">{{ tokens.chrome.footerTagline }}</p>
-                                <div v-if="footerSocialPreview.length" class="mt-2 flex flex-wrap gap-2" :class="tokens.chrome?.footerStyle === 'centered' ? 'justify-center' : ''">
+                                <p v-if="tokens.chrome?.footerTagline" class="mt-1 w-full opacity-60">{{ tokens.chrome.footerTagline }}</p>
+                                <div
+                                    v-if="footerSocialPreview.length"
+                                    class="flex flex-wrap gap-2"
+                                    :class="{
+                                        'mt-2': tokens.chrome?.footerStyle !== 'split',
+                                        'ml-auto': tokens.chrome?.footerStyle === 'split',
+                                        'justify-center': tokens.chrome?.footerStyle === 'centered',
+                                    }"
+                                >
                                     <span
                                         v-for="(item, index) in footerSocialPreview"
                                         :key="index"
@@ -1478,7 +1494,11 @@ onMounted(load)
                                         <template v-if="tokens.chrome?.footerSocialStyle !== 'icons'">{{ item.label }}</template>
                                     </span>
                                 </div>
-                                <p v-if="tokens.chrome?.footerShowCredit !== false" class="mt-2 w-full opacity-70">
+                                <p
+                                    v-if="tokens.chrome?.footerShowCredit !== false"
+                                    class="w-full opacity-70"
+                                    :class="tokens.chrome?.footerStyle === 'split' ? 'mt-1' : 'mt-2'"
+                                >
                                     {{ tokens.chrome?.footerCreditText || 'Powered by DiamondCMS' }}
                                 </p>
                             </div>

@@ -720,13 +720,22 @@ onUnmounted(() => {
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none md:pointer-events-auto md:translate-x-0'"
         >
             <div class="flex items-center justify-between gap-2 px-4 py-5">
-                <div class="flex min-w-0 items-center gap-2">
+                <a
+                    href="/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="hover:bg-sidebar-accent flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition"
+                    title="Open public site"
+                >
                     <img :src="brandLogo" alt="" class="size-7 shrink-0">
                     <div class="min-w-0">
-                        <p class="truncate font-semibold tracking-tight">DiamondCMS</p>
+                        <p class="flex items-center gap-1.5 truncate font-semibold tracking-tight">
+                            DiamondCMS
+                            <ExternalLink class="text-muted-foreground size-3.5 shrink-0" />
+                        </p>
                         <p class="text-muted-foreground truncate text-xs">Website studio</p>
                     </div>
-                </div>
+                </a>
                 <Button variant="ghost" size="icon-sm" class="md:hidden" aria-label="Close menu" @click="closeSidebar">
                     <X class="size-4" />
                 </Button>

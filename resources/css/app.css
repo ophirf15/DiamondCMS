@@ -149,6 +149,7 @@ a:hover {
 .dc-header {
     animation: dc-rise 0.55s ease-out both;
     border-bottom: 1px solid var(--dc-line);
+    gap: 1rem 1.5rem;
 }
 
 .dc-header nav {
@@ -193,8 +194,8 @@ a:hover {
 .dc-header-actions {
     align-items: center;
     display: flex;
+    flex-shrink: 0;
     gap: 0.65rem;
-    margin-left: auto;
 }
 
 .dc-nav-toggle {
@@ -206,6 +207,7 @@ a:hover {
     display: flex;
     flex-wrap: wrap;
     gap: 1.25rem;
+    margin-left: auto;
 }
 
 .dc-header--pill {
@@ -330,8 +332,34 @@ a:hover {
 }
 
 .dc-footer--split {
-    display: grid;
-    grid-template-columns: 1fr auto;
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.dc-footer--split .dc-footer-brand {
+    margin-right: auto;
+}
+
+.dc-footer--split nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.dc-footer--split .dc-footer-socials {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    margin-left: auto;
+    margin-top: 0;
+    width: auto;
+}
+
+.dc-footer--split .dc-footer-credit {
+    flex: 1 1 100%;
+    margin-top: 0.15rem;
+    width: 100%;
 }
 
 .dc-footer--centered {
@@ -357,6 +385,108 @@ a:hover {
 a.dc-footer-credit:hover {
     color: var(--dc-fg);
     text-decoration: underline;
+}
+
+.dc-legal {
+    margin: 0 auto;
+    max-width: min(46rem, var(--dc-container));
+    padding: 2.5rem var(--dc-header-pad-x, 1.5rem) 4rem;
+}
+
+.dc-legal-header {
+    border-bottom: 1px solid var(--dc-line);
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+}
+
+.dc-legal-header h1 {
+    font-family: var(--dc-font-heading);
+    font-size: clamp(1.85rem, 4vw, 2.6rem);
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    margin: 0.35rem 0 0.65rem;
+}
+
+.dc-legal-meta {
+    color: var(--dc-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.dc-legal-body {
+    color: color-mix(in srgb, var(--dc-fg) 92%, var(--dc-muted));
+    display: grid;
+    gap: 1.75rem;
+    line-height: 1.7;
+}
+
+.dc-legal-body h2 {
+    font-family: var(--dc-font-heading);
+    font-size: 1.2rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.65rem;
+}
+
+.dc-legal-body h3 {
+    font-size: 0.95rem;
+    font-weight: 650;
+    margin: 0 0 0.45rem;
+}
+
+.dc-legal-body p,
+.dc-legal-body ul {
+    margin: 0 0 0.75rem;
+}
+
+.dc-legal-body ul {
+    padding-left: 1.2rem;
+}
+
+.dc-legal-body li {
+    margin-bottom: 0.35rem;
+}
+
+.dc-legal-body a {
+    color: var(--dc-primary);
+}
+
+.dc-legal-callout {
+    background: color-mix(in srgb, var(--dc-surface) 88%, transparent);
+    border: 1px solid var(--dc-line);
+    border-radius: calc(var(--dc-radius) + 0.15rem);
+    margin: 0.85rem 0;
+    padding: 0.95rem 1.05rem;
+}
+
+.dc-legal-callout--todo {
+    background: color-mix(in srgb, var(--dc-accent) 12%, var(--dc-surface));
+    border-color: color-mix(in srgb, var(--dc-accent) 35%, var(--dc-line));
+}
+
+.dc-legal-missing {
+    color: var(--dc-muted);
+    font-style: italic;
+}
+
+.dc-legal-nav {
+    border-top: 1px solid var(--dc-line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.35rem;
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+}
+
+.dc-legal-nav a {
+    color: var(--dc-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.dc-legal-nav a:hover {
+    color: var(--dc-fg);
 }
 
 .dc-button + .dc-button {
@@ -911,11 +1041,24 @@ body.dc-btn-underline .dc-button:hover,
 }
 
 .dc-footer-socials {
-    margin-top: 0.85rem;
+    align-items: center;
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 0.65rem 1rem;
+    margin-top: 0.35rem;
+    opacity: 1;
+    transform: none;
+    width: 100%;
 }
 
 .dc-footer-socials.dc-social-links--icons {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
+}
+
+.dc-footer--centered .dc-footer-socials {
+    display: flex;
+    justify-content: center;
 }
 
 /* HeroUI-inspired surface polish on top of shadcn tokens */

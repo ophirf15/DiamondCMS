@@ -7,6 +7,7 @@ namespace App\Domains\SEO\Support;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Domains\Legal\Support\LegalSettingsManager;
 
 final class SeoManager
 {
@@ -17,6 +18,17 @@ final class SeoManager
             ->each(fn (object $page) => $urls->push(['loc' => url($page->slug === 'home' ? '/' : '/'.$page->slug), 'lastmod' => $page->updated_at]));
         DB::table('projects')->where('status', 'published')->where('visibility', 'public')->whereNull('deleted_at')->get()
             ->each(fn (object $project) => $urls->push(['loc' => route('projects.show', $project->slug), 'lastmod' => $project->updated_at]));
+
+        $legal = LegalSettingsManager::all();
+        foreach (['privacy', 'cookies', 'terms'] as $page) {
+            if (! ($legal['pages'][$page] ?? false)) {
+                continue;
+            }
+            $urls->push([
+                'loc' => url('/'.$page),
+                'lastmod' => $legal['effective_date'] ?: now()->toDateString(),
+            ]);
+        }
 
         return view('public.sitemap', ['urls' => $urls])->render();
     }

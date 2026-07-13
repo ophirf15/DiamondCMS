@@ -271,8 +271,25 @@ class PhaseSevenToTwelveTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
 
         $envPath = base_path('.env');
-        $originalEnv = is_file($envPath) ? (string) file_get_contents($envPath) : null;
+        $backupPath = base_path('.env.phpunit-backup');
+        $hadEnv = is_file($envPath);
+        if ($hadEnv) {
+            $this->assertTrue(@copy($envPath, $backupPath), 'Could not back up .env before update apply test.');
+        }
         $validKey = 'base64:'.base64_encode(random_bytes(32));
+
+        $restoreEnv = static function () use ($envPath, $backupPath, $hadEnv): void {
+            if (is_file($backupPath)) {
+                @copy($backupPath, $envPath);
+                @unlink($backupPath);
+
+                return;
+            }
+            if (! $hadEnv && is_file($envPath)) {
+                @unlink($envPath);
+            }
+        };
+        register_shutdown_function($restoreEnv);
 
         try {
             file_put_contents($envPath, "APP_KEY={$validKey}\nDB_DATABASE=keepme\n");
@@ -315,11 +332,7 @@ class PhaseSevenToTwelveTest extends TestCase
             $this->assertSame('site-content', Storage::disk('public')->get('media/keep-me.txt'));
             $this->assertFalse(Storage::disk('public')->exists('media/evil.txt'));
         } finally {
-            if ($originalEnv !== null) {
-                file_put_contents($envPath, $originalEnv);
-            } elseif (is_file($envPath)) {
-                @unlink($envPath);
-            }
+            $restoreEnv();
         }
     }
 }

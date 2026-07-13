@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { Send } from '@lucide/vue'
+import { ExternalLink, Send } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,13 +17,27 @@ type MailConfig = {
     from_address?: string
     from_name?: string
 }
+type LegalSettings = {
+    operator_name: string
+    contact_email: string
+    contact_address: string
+    website_url: string
+    jurisdiction: string
+    effective_date: string
+    show_in_footer: boolean
+    pages: {
+        privacy: boolean
+        cookies: boolean
+        terms: boolean
+    }
+}
 
 const props = defineProps<{
     api: <T>(url: string, options?: RequestInit) => Promise<T>
     pages: PageOption[]
 }>()
 
-const tab = ref<'general' | 'smtp' | 'permalinks'>('general')
+const tab = ref<'general' | 'smtp' | 'legal' | 'permalinks'>('general')
 const siteName = ref('')
 const homepageSlug = ref('home')
 const mail = ref<MailConfig>({
@@ -37,6 +51,16 @@ const mail = ref<MailConfig>({
 const mailPassword = ref('')
 const testRecipient = ref('')
 const saving = ref(false)
+const legal = ref<LegalSettings>({
+    operator_name: '',
+    contact_email: '',
+    contact_address: '',
+    website_url: '',
+    jurisdiction: '',
+    effective_date: '',
+    show_in_footer: true,
+    pages: { privacy: true, cookies: true, terms: true },
+})
 
 function decodeSetting(raw: unknown): string {
     if (typeof raw !== 'string') return ''
@@ -56,6 +80,7 @@ async function load(): Promise<void> {
         siteName.value = nameRow ? decodeSetting(nameRow.value) : ''
         homepageSlug.value = homeRow ? decodeSetting(homeRow.value) || 'home' : 'home'
         mail.value = { ...mail.value, ...(await props.api<MailConfig>('/mail')) }
+        legal.value = { ...legal.value, ...(await props.api<LegalSettings>('/legal')) }
         if (!testRecipient.value && mail.value.from_address) {
             testRecipient.value = mail.value.from_address
         }
@@ -110,6 +135,23 @@ async function saveMail(): Promise<void> {
     }
 }
 
+async function saveLegal(): Promise<void> {
+    saving.value = true
+    try {
+        legal.value = await props.api<LegalSettings>('/legal', {
+            method: 'PUT',
+            body: JSON.stringify(legal.value),
+        })
+        toast.success(legal.value.show_in_footer
+            ? 'Legal settings saved — footer links updated'
+            : 'Legal settings saved')
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not save legal settings')
+    } finally {
+        saving.value = false
+    }
+}
+
 async function sendTest(): Promise<void> {
     if (!testRecipient.value) return
     try {
@@ -130,12 +172,13 @@ onMounted(load)
     <section class="space-y-4">
         <div>
             <h1 class="text-3xl font-semibold tracking-tight">Settings</h1>
-            <p class="text-muted-foreground text-sm">Site identity, email delivery, and how page addresses work.</p>
+            <p class="text-muted-foreground text-sm">Site identity, email delivery, legal pages, and how page addresses work.</p>
         </div>
 
         <div class="flex flex-wrap gap-1 rounded-lg border p-1 w-fit">
             <Button size="sm" :variant="tab === 'general' ? 'secondary' : 'ghost'" @click="tab = 'general'">General</Button>
             <Button size="sm" :variant="tab === 'smtp' ? 'secondary' : 'ghost'" @click="tab = 'smtp'">Email / SMTP</Button>
+            <Button size="sm" :variant="tab === 'legal' ? 'secondary' : 'ghost'" @click="tab = 'legal'">Legal</Button>
             <Button size="sm" :variant="tab === 'permalinks' ? 'secondary' : 'ghost'" @click="tab = 'permalinks'">Permalinks</Button>
         </div>
 
@@ -223,6 +266,93 @@ onMounted(load)
             </CardContent>
         </Card>
 
+        <div v-else-if="tab === 'legal'" class="max-w-2xl space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Legal pages</CardTitle>
+                    <CardDescription>
+                        DiamondCMS publishes Privacy, Cookies, and Terms pages with standard wording.
+                        Fill in the details below — sections that still need your info are highlighted on the public pages.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input v-model="legal.pages.privacy" type="checkbox" class="size-4 rounded border">
+                            Privacy Policy
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input v-model="legal.pages.cookies" type="checkbox" class="size-4 rounded border">
+                            Cookie Policy
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input v-model="legal.pages.terms" type="checkbox" class="size-4 rounded border">
+                            Terms of Use
+                        </label>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input v-model="legal.show_in_footer" type="checkbox" class="size-4 rounded border">
+                        Add / update footer menu links when saving
+                    </label>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <a class="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline" href="/privacy" target="_blank" rel="noopener">
+                            /privacy <ExternalLink class="size-3" />
+                        </a>
+                        <a class="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline" href="/cookies" target="_blank" rel="noopener">
+                            /cookies <ExternalLink class="size-3" />
+                        </a>
+                        <a class="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline" href="/terms" target="_blank" rel="noopener">
+                            /terms <ExternalLink class="size-3" />
+                        </a>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Your details</CardTitle>
+                    <CardDescription>These fill the operator, contact, and jurisdiction sections on the legal pages.</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="legal-operator">Operator / business name</Label>
+                        <Input id="legal-operator" v-model="legal.operator_name" placeholder="Ophir Yahalom" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="legal-email">Contact email</Label>
+                        <Input id="legal-email" v-model="legal.contact_email" type="email" placeholder="you@example.com" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="legal-address">Mailing address (optional)</Label>
+                        <textarea
+                            id="legal-address"
+                            v-model="legal.contact_address"
+                            rows="3"
+                            class="border-input bg-background focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-1"
+                            placeholder="Street, City, State, ZIP, Country"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="legal-url">Website URL</Label>
+                        <Input id="legal-url" v-model="legal.website_url" placeholder="https://yoursite.com" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="legal-jurisdiction">Governing law / jurisdiction</Label>
+                        <Input id="legal-jurisdiction" v-model="legal.jurisdiction" placeholder="State of California, United States" />
+                        <p class="text-muted-foreground text-xs">Used in Privacy and Terms. Ask a lawyer if you are unsure.</p>
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="legal-effective">Effective date</Label>
+                        <Input id="legal-effective" v-model="legal.effective_date" type="date" />
+                    </div>
+                    <Button :disabled="saving" @click="saveLegal">Save legal settings</Button>
+                    <p class="text-muted-foreground text-xs">
+                        These pages are templates for a personal site — not a substitute for legal advice.
+                    </p>
+                </CardContent>
+            </Card>
+        </div>
+
         <Card v-else class="max-w-2xl">
             <CardHeader>
                 <CardTitle>Permalinks</CardTitle>
@@ -235,8 +365,12 @@ onMounted(load)
                     <code class="bg-muted rounded px-1 py-0.5">/about</code>.
                 </p>
                 <p class="text-muted-foreground">
+                    Legal pages are always at <code class="bg-muted rounded px-1 py-0.5">/privacy</code>,
+                    <code class="bg-muted rounded px-1 py-0.5">/cookies</code>, and
+                    <code class="bg-muted rounded px-1 py-0.5">/terms</code> when enabled under Legal.
+                </p>
+                <p class="text-muted-foreground">
                     The homepage uses slug <code class="bg-muted rounded px-1 py-0.5">home</code> (or your chosen homepage slug) and is served at <code class="bg-muted rounded px-1 py-0.5">/</code>.
-                    WordPress-style pretty-permalink plugins are not needed — this is the only public URL pattern.
                 </p>
             </CardContent>
         </Card>

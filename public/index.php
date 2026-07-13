@@ -29,7 +29,12 @@ if (! is_file($envPath) && is_file($envExample)) {
 }
 if (is_file($envPath)) {
     $envContents = (string) file_get_contents($envPath);
-    if (! preg_match('/^APP_KEY=\s*base64:.+/m', $envContents)) {
+    $needsKey = true;
+    if (preg_match('/^APP_KEY=\s*(base64:[A-Za-z0-9+\/=]+)/m', $envContents, $match) === 1) {
+        $decoded = base64_decode(substr($match[1], 7), true);
+        $needsKey = $decoded === false || ! in_array(strlen($decoded), [16, 32], true);
+    }
+    if ($needsKey) {
         $generatedKey = 'base64:'.base64_encode(random_bytes(32));
         if (preg_match('/^APP_KEY=.*/m', $envContents)) {
             $envContents = preg_replace('/^APP_KEY=.*/m', 'APP_KEY='.$generatedKey, $envContents) ?? $envContents;

@@ -376,6 +376,30 @@ Route::get('/robots.txt', fn (SeoManager $seo) => response($seo->robots(), 200, 
 
 Route::get('/404', fn () => response()->view('public.404', [], 404))->name('not-found');
 
+Route::get('/privacy', function () {
+    abort_unless(\App\Domains\Legal\Support\LegalSettingsManager::pageEnabled('privacy'), 404);
+
+    return view('public.legal.privacy', [
+        'legal' => \App\Domains\Legal\Support\LegalSettingsManager::all(),
+    ]);
+})->name('legal.privacy');
+
+Route::get('/cookies', function () {
+    abort_unless(\App\Domains\Legal\Support\LegalSettingsManager::pageEnabled('cookies'), 404);
+
+    return view('public.legal.cookies', [
+        'legal' => \App\Domains\Legal\Support\LegalSettingsManager::all(),
+    ]);
+})->name('legal.cookies');
+
+Route::get('/terms', function () {
+    abort_unless(\App\Domains\Legal\Support\LegalSettingsManager::pageEnabled('terms'), 404);
+
+    return view('public.legal.terms', [
+        'legal' => \App\Domains\Legal\Support\LegalSettingsManager::all(),
+    ]);
+})->name('legal.terms');
+
 Route::get('/{slug}', function (string $slug, Request $request, FormManager $forms) {
     if ($redirect = app(SeoManager::class)->redirectFor($slug)) {
         return redirect()->to($redirect->target, (int) $redirect->status_code);

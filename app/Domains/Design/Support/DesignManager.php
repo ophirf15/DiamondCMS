@@ -350,6 +350,32 @@ final class DesignManager
     public static function saveTokens(array $tokens, ?int $userId = null): void
     {
         $tokens = array_replace_recursive(self::defaultTokens(), $tokens);
+
+        // List fields must replace, not recursively merge with defaults/prior keys.
+        if (isset($tokens['chrome']) && is_array($tokens['chrome'])) {
+            if (array_key_exists('footerSocialLinkIds', $tokens['chrome'])) {
+                $ids = $tokens['chrome']['footerSocialLinkIds'];
+                $tokens['chrome']['footerSocialLinkIds'] = is_array($ids)
+                    ? array_values(array_filter($ids, fn ($id) => is_string($id) && $id !== ''))
+                    : [];
+            }
+            if (array_key_exists('footerSocials', $tokens['chrome']) && is_array($tokens['chrome']['footerSocials'])) {
+                $tokens['chrome']['footerSocials'] = array_values($tokens['chrome']['footerSocials']);
+            }
+
+            $ids = $tokens['chrome']['footerSocialLinkIds'] ?? [];
+            if (is_array($ids) && $ids !== []) {
+                $tokens['chrome']['footerSocials'] = array_map(
+                    static fn (array $item): array => [
+                        'label' => (string) ($item['label'] ?? ''),
+                        'url' => (string) ($item['url'] ?? '#'),
+                        'icon' => (string) ($item['icon'] ?? ''),
+                    ],
+                    SocialLinksManager::resolve($ids),
+                );
+            }
+        }
+
         DB::table('settings')->updateOrInsert(
             ['key' => 'design_tokens'],
             [
@@ -566,15 +592,43 @@ final class DesignManager
         $chrome = self::chrome();
         $ids = $chrome['footerSocialLinkIds'] ?? null;
         if (is_array($ids) && $ids !== []) {
-            $resolved = SocialLinksManager::resolve($ids);
+            $resolved = SocialLinksManager::resolve(array_values(array_filter($ids, fn ($id) => is_string($id) && $id !== '')));
             if ($resolved !== []) {
-                return $resolved;
+                return array_map(
+                    static fn (array $item): array => [
+                        'label' => (string) ($item['label'] ?? ''),
+                        'url' => (string) ($item['url'] ?? '#'),
+                        'icon' => (string) ($item['icon'] ?? ''),
+                    ],
+                    $resolved,
+                );
             }
         }
 
         $legacy = $chrome['footerSocials'] ?? [];
+        if (! is_array($legacy)) {
+            return [];
+        }
 
-        return is_array($legacy) ? array_values($legacy) : [];
+        return array_values(array_filter(array_map(
+            static function ($item): ?array {
+                if (! is_array($item)) {
+                    return null;
+                }
+                $label = trim((string) ($item['label'] ?? ''));
+                $url = trim((string) ($item['url'] ?? ''));
+                if ($label === '' && ($url === '' || $url === '#')) {
+                    return null;
+                }
+
+                return [
+                    'label' => $label !== '' ? $label : 'Link',
+                    'url' => $url !== '' ? $url : '#',
+                    'icon' => (string) ($item['icon'] ?? ''),
+                ];
+            },
+            $legacy,
+        )));
     }
 
     /** @return array<string, mixed> */

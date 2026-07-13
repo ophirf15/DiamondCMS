@@ -13,6 +13,7 @@ use App\Domains\Design\Support\MenuManager;
 use App\Domains\Design\Support\SocialLinksManager;
 use App\Domains\Forms\Support\FormManager;
 use App\Domains\Installer\Support\InstallState;
+use App\Domains\Legal\Support\LegalSettingsManager;
 use App\Domains\Mail\Support\MailSettingsManager;
 use App\Domains\Media\Support\MediaManager;
 use App\Domains\Portfolio\Support\PortfolioManager;
@@ -355,6 +356,28 @@ Route::middleware(['auth', 'admin'])->group(function (): void {
             ActivityLogger::log('settings.updated', null, ['key' => $key], $request);
 
             return response()->json(['ok' => true]);
+        });
+
+        Route::get('/legal', fn () => response()->json(LegalSettingsManager::all()));
+        Route::put('/legal', function (Request $request) {
+            $data = $request->validate([
+                'operator_name' => ['nullable', 'string', 'max:190'],
+                'contact_email' => ['nullable', 'email', 'max:190'],
+                'contact_address' => ['nullable', 'string', 'max:1000'],
+                'website_url' => ['nullable', 'string', 'max:500'],
+                'jurisdiction' => ['nullable', 'string', 'max:190'],
+                'effective_date' => ['nullable', 'string', 'max:32'],
+                'show_in_footer' => ['nullable', 'boolean'],
+                'pages' => ['nullable', 'array'],
+                'pages.privacy' => ['nullable', 'boolean'],
+                'pages.cookies' => ['nullable', 'boolean'],
+                'pages.terms' => ['nullable', 'boolean'],
+            ]);
+
+            $saved = LegalSettingsManager::save($data, $request->user()->id);
+            ActivityLogger::log('legal.settings_updated', null, [], $request);
+
+            return response()->json($saved);
         });
 
         Route::get('/mail', fn (MailSettingsManager $mail) => response()->json($mail->publicConfig()));

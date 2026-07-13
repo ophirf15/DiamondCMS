@@ -46,6 +46,13 @@ final class SocialLinksManager
             'created_at' => DB::table('settings')->where('key', self::KEY)->value('created_at') ?? now(),
         ]);
 
+        // Keep footer snapshot in sync when Theme already selected library IDs.
+        $tokens = DesignManager::tokens();
+        $ids = $tokens['chrome']['footerSocialLinkIds'] ?? [];
+        if (is_array($ids) && $ids !== []) {
+            DesignManager::saveTokens($tokens);
+        }
+
         return $normalized;
     }
 

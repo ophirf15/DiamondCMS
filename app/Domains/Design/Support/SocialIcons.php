@@ -150,7 +150,8 @@ final class SocialIcons
         $variant = in_array($variant, ['list', 'icons', 'icons-labels', 'pills'], true) ? $variant : 'icons-labels';
         $links = collect($items)->map(fn ($item) => self::linkHtml(is_array($item) ? $item : [], $variant))->implode('');
         $class = trim('dc-social-links dc-social-links--'.$variant.' '.$extraClass);
+        $animate = ! str_contains($extraClass, 'dc-footer-socials');
 
-        return '<div class="'.$class.'" data-dc-animate="stagger">'.$links.'</div>';
+        return '<div class="'.$class.'"'.($animate ? ' data-dc-animate="stagger"' : '').'>'.$links.'</div>';
     }
 }

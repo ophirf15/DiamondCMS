@@ -30,11 +30,14 @@
             @endif
         </div>
     @endif
-    <nav aria-label="Footer">
-        @foreach (diamondcms_menu('footer') as $item)
-            <a href="{{ $item['url'] }}">{{ $item['label'] }}</a>
-        @endforeach
-    </nav>
+    @php($footerMenu = diamondcms_menu('footer'))
+    @if ($footerMenu !== [])
+        <nav aria-label="Footer">
+            @foreach ($footerMenu as $item)
+                <a href="{{ $item['url'] }}">{{ $item['label'] }}</a>
+            @endforeach
+        </nav>
+    @endif
     @if ($footerSocials !== [])
         {!! \App\Domains\Design\Support\SocialIcons::groupHtml(array_values($footerSocials), $footerSocialStyle, 'dc-footer-socials') !!}
     @endif

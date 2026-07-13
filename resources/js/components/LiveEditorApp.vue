@@ -23,7 +23,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { uploadMediaFile } from '@/lib/mediaUpload'
 import { initThemeToggle } from '@/public'
 import { builderDraggableOptions } from '@/lib/builderDraggable'
-import { type SocialLinkRecord } from '@/lib/socialLinks'
+import { resolveFooterSocialLinks, type SocialLinkRecord } from '@/lib/socialLinks'
 
 type BuilderDocument = {
     schema: number
@@ -89,16 +89,28 @@ const menuItems = boot.menuItems?.length
         { label: 'Contact', url: '/contact' },
     ]
 const footerItems = boot.footerItems || []
-const chrome = computed<ChromeConfig>(() => boot.chrome || {
-    headerStyle: 'classic',
-    mobileNav: 'hamburger',
-    footerStyle: 'branded',
-    buttonStyle: 'solid',
-    footerShowLogo: true,
-    footerShowSiteName: true,
-    footerTagline: '',
-    footerSocials: [],
-    footerSocialStyle: 'icons',
+const chrome = computed<ChromeConfig>(() => {
+    const base = boot.chrome || {
+        headerStyle: 'classic',
+        mobileNav: 'hamburger',
+        footerStyle: 'branded',
+        buttonStyle: 'solid',
+        footerShowLogo: true,
+        footerShowSiteName: true,
+        footerTagline: '',
+        footerSocials: [],
+        footerSocialLinkIds: [],
+        footerSocialStyle: 'icons',
+    }
+
+    return {
+        ...base,
+        footerSocials: resolveFooterSocialLinks(
+            socialLinksLibrary.value,
+            base.footerSocialLinkIds,
+            base.footerSocials,
+        ),
+    }
 })
 const visitorToggle = !!boot.visitorToggle
 
